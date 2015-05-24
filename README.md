@@ -6,7 +6,7 @@ Send daily/weekly/monthly email reports with graphs plotted from sysstat monitor
 There are a lot of tools available to plot sysstat data and generate graphs, but they either have important limitations, or require a web server running to serve the graphs.
 
 This tool attempts to be simple and efficient and allow generating periodic reports (from cron) to be emailed directly.
- 
+
 
 ## Features
 
@@ -36,8 +36,8 @@ Daily network graph:
 Daily IO graph:  
 [![Daily IO graph](http://i.imgur.com/sCEZ773m.png)](http://i.imgur.com/sCEZ773.png)
 
-Weekly CPU graph:  
-[![Weekly CPU graph](http://i.imgur.com/pYRv26Em.png)](http://i.imgur.com/pYRv26E.png)
+Weekly network graph:  
+[![Weekly network graph](http://i.imgur.com/pYRv26Em.png)](http://i.imgur.com/pYRv26E.png)
 
 
 ## Dependencies
@@ -49,13 +49,13 @@ Weekly CPU graph:
 
 And of course [sysstat](http://sebastien.godard.pagesperso-orange.fr/).
 
-On Ubuntu and other Debian derivatives, you can install all of them with:  
+On Ubuntu and other Debian derivatives, you can install all of them with:
 `sudo apt-get install sysstat python3.4 gnuplot-nox sendmail-bin optipng`
 
 
 ## Installation
 
-Download it to `/usr/local/bin`, ie with:  
+Download it to `/usr/local/bin`, ie with:
 
     curl https://raw.githubusercontent.com/desbma/sysstat_mail_report/master/sysstat_report.py > /usr/local/bin/sysstat_report.py && chmod +x /usr/local/bin/sysstat_report.py
 
@@ -73,7 +73,7 @@ The recommand way of calling the script is through a cron job, so for example fo
 
     #!/bin/sh
     sysstat_report.py daily 'Sysstat <email.from@example.com>' 'email.to@example.com' -v warning
-    
+
 When the script is called every day, you will receive an email with 5 graphs for the previous day.
 
 Run `sysstat_report.py -h` to get full command line reference.

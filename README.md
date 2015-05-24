@@ -56,7 +56,9 @@ On Ubuntu and other Debian derivatives, you can install all of them with:
 ## Installation
 
 Download it to `/usr/local/bin`, ie with:  
-`curl https://raw.githubusercontent.com/desbma/sysstat_mail_report/master/sysstat_report.py > /usr/local/bin/sysstat_report.py`
+
+    curl https://raw.githubusercontent.com/desbma/sysstat_mail_report/master/sysstat_report.py > /usr/local/bin/sysstat_report.py && chmod +x /usr/local/bin/sysstat_report.py
+
 
 ### Sysstat configuration
 

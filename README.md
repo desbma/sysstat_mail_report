@@ -49,7 +49,7 @@ Weekly network graph:
 
 And of course [sysstat](http://sebastien.godard.pagesperso-orange.fr/).
 
-On Ubuntu and other Debian derivatives, you can install all of them with:
+On Ubuntu and other Debian derivatives, you can install all of them with:  
 `sudo apt-get install sysstat python3.4 gnuplot-nox sendmail-bin optipng`
 
 

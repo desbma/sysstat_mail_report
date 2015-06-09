@@ -344,7 +344,7 @@ class Plotter:
     if not text:
       if HAS_OPTIPNG:
         logging.getLogger().debug("Crunching '%s'..." % (output_filepath))
-        subprocess.check_call(("optipng", "-quiet", "-o", "7", output_filepath))
+        subprocess.check_call(("optipng", "-quiet", "-o", "1", output_filepath))
     else:
       # remove first 2 bytes as they cause problems with emails
       with open(output_filepath, "rt") as output_file:

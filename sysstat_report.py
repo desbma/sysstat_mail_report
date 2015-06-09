@@ -25,7 +25,7 @@ import time
 
 
 ReportType = enum.Enum("ReportType", ("DAILY", "WEEKLY", "MONTHLY"))
-SysstatDataType = enum.Enum("SysstatDataType", ("CPU", "MEM", "SWAP", "NET", "IO"))
+SysstatDataType = enum.Enum("SysstatDataType", ("LOAD", "CPU", "MEM", "SWAP", "NET", "IO"))
 
 HAS_OPTIPNG = shutil.which("optipng") is not None
 
@@ -172,16 +172,13 @@ class SysstatData:
 
     for sa_filepath in self.sa_filepaths:
       cmd = ["sadf", "-d", "-U", "--"]
-      if dtype is SysstatDataType.CPU:
-        cmd.append("-u")
-      elif dtype is SysstatDataType.MEM:
-        cmd.append("-r")
-      elif dtype is SysstatDataType.SWAP:
-        cmd.append("-S")
-      elif dtype is SysstatDataType.NET:
-        cmd.extend(("-n", "DEV"))
-      elif dtype is SysstatDataType.IO:
-        cmd.append("-b")
+      dtype_cmd = {SysstatDataType.LOAD: ("-q",),
+                   SysstatDataType.CPU: ("-u",),
+                   SysstatDataType.MEM: ("-r",),
+                   SysstatDataType.SWAP: ("-S",),
+                   SysstatDataType.NET: ("-n", "DEV"),
+                   SysstatDataType.IO: ("-b",)}
+      cmd.extend(dtype_cmd[dtype])
       cmd.append(sa_filepath)
       with open(output_filepath, "ab") as output_file:
         subprocess.check_call(cmd, stdout=output_file)
@@ -208,21 +205,19 @@ class SysstatData:
             if itf in itf_files:
               itf_files[itf].write(line)
 
-    if dtype is SysstatDataType.CPU:
-      # hostname;interval;timestamp;CPU;%user;%nice;%system;%iowait;%steal;%idle
-      indexes = (3, 5, 6, 7, 8, 9, 10)
-    elif dtype is SysstatDataType.MEM:
-      # hostname;interval;timestamp;kbmemfree;kbmemused;%memused;kbbuffers;kbcached;kbcommit;%commit;kbactive;kbinact;kbdirty
-      indexes = (3, 5, 7, 8, 9, 11, 13)
-    elif dtype is SysstatDataType.SWAP:
-      # hostname;interval;timestamp;kbswpfree;kbswpused;%swpused;kbswpcad;%swpcad
-      indexes = (3, 6)
-    elif dtype is SysstatDataType.NET:
-      # hostname;interval;timestamp;IFACE;rxpck/s;txpck/s;rxkB/s;txkB/s;rxcmp/s;txcmp/s;rxmcst/s;%ifutil
-      indexes = (3, 7, 8)
-    elif dtype is SysstatDataType.IO:
-      # hostname;interval;timestamp;tps;rtps;wtps;bread/s;bwrtn/s
-      indexes = (3, 7, 8)
+    dtype_indexes = {# hostname;interval;timestamp;runq-sz;plist-sz;ldavg-1;ldavg-5;ldavg-15;blocked
+                     SysstatDataType.LOAD: (3, 7),
+                     # hostname;interval;timestamp;CPU;%user;%nice;%system;%iowait;%steal;%idle
+                     SysstatDataType.CPU: (3, 5, 6, 7, 8, 9, 10),
+                     # hostname;interval;timestamp;kbmemfree;kbmemused;%memused;kbbuffers;kbcached;kbcommit;%commit;kbactive;kbinact;kbdirty
+                     SysstatDataType.MEM: (3, 5, 7, 8, 9, 11, 13),
+                     # hostname;interval;timestamp;kbswpfree;kbswpused;%swpused;kbswpcad;%swpcad
+                     SysstatDataType.SWAP: (3, 6),
+                     # hostname;interval;timestamp;IFACE;rxpck/s;txpck/s;rxkB/s;txkB/s;rxcmp/s;txcmp/s;rxmcst/s;%ifutil
+                     SysstatDataType.NET: (3, 7, 8),
+                     # hostname;interval;timestamp;tps;rtps;wtps;bread/s;bwrtn/s
+                     SysstatDataType.IO: (3, 7, 8)}
+    indexes = dtype_indexes[dtype]
 
     return indexes, net_output_filepaths
 
@@ -258,6 +253,8 @@ class Plotter:
                            "set output '%s'" % (output_filepath)))
 
     # input data setup
+    if data_type is SysstatDataType.LOAD:
+      gnuplot_code.append("set decimalsign locale")
     gnuplot_code.extend(("set timefmt '%s'",
                          "set datafile separator ';'"))
 
@@ -340,6 +337,7 @@ class Plotter:
     gnuplot_code = ";\n".join(gnuplot_code) + ";"
     subprocess.check_output(("gnuplot",),
                             input=gnuplot_code,
+                            stderr=None if logging.getLogger().isEnabledFor(logging.DEBUG) else subprocess.DEVNULL,
                             universal_newlines=True)
 
     # output post processing
@@ -391,7 +389,11 @@ if __name__ == "__main__":
   with tempfile.TemporaryDirectory(prefix="%s_" % (os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe())))[0])) as temp_dir:
     sysstat_data = SysstatData(report_type, temp_dir)
     plotter = Plotter(report_type)
-    plot_args = {SysstatDataType.CPU: {"title": "CPU",
+    plot_args = {SysstatDataType.LOAD: {"title": "Load",
+                                        "data_titles": ("ldavg-5",),
+                                        "ylabel": "5min load average",
+                                        "yrange": (0, None)},
+                 SysstatDataType.CPU: {"title": "CPU",
                                        "data_titles": ("user",
                                                        "nice",
                                                        "system",

@@ -11,7 +11,7 @@ This tool attempts to be simple and efficient and allow generating periodic repo
 ## Features
 
 * Allow generating daily/weekly/monthly reports
-* Generates graphs with data from CPU usage, memory usage, swap usage, network IO and drive IO (see examples below), additionnaly display reboot times
+* Generates graphs with data from 5min load average, CPU usage, memory usage, swap usage, network IO and drive IO (see examples below), additionnaly display reboot times
 * Construct email with both PNG and alternate ASCII graphs to be compatible with text only mail clients, or low bandwith mail viewing
 * Automatically scale graphs according to system characteristics (ie. get total memory for memory graph y axis)
 * Weekly and monthly graphs are automatically smoothed (hides small variations better viewed on daily graphs) to remain readable
@@ -74,7 +74,7 @@ The recommand way of calling the script is through a cron job, so for example fo
     #!/bin/sh
     sysstat_report.py daily 'Sysstat <email.from@example.com>' 'email.to@example.com' -v warning
 
-When the script is called every day, you will receive an email with 5 graphs for the previous day.
+When the script is called every day, you will receive an email with the graphs for the previous day.
 
 Run `sysstat_report.py -h` to get full command line reference.
 

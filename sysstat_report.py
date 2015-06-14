@@ -205,21 +205,24 @@ class SysstatData:
             if itf in itf_files:
               itf_files[itf].write(line)
 
-    dtype_indexes = {# hostname;interval;timestamp;runq-sz;plist-sz;ldavg-1;ldavg-5;ldavg-15;blocked
-                     SysstatDataType.LOAD: (3, 7),
-                     # hostname;interval;timestamp;CPU;%user;%nice;%system;%iowait;%steal;%idle
-                     SysstatDataType.CPU: (3, 5, 6, 7, 8, 9, 10),
-                     # hostname;interval;timestamp;kbmemfree;kbmemused;%memused;kbbuffers;kbcached;kbcommit;%commit;kbactive;kbinact;kbdirty
-                     SysstatDataType.MEM: (3, 5, 7, 8, 9, 11, 13),
-                     # hostname;interval;timestamp;kbswpfree;kbswpused;%swpused;kbswpcad;%swpcad
-                     SysstatDataType.SWAP: (3, 6),
-                     # hostname;interval;timestamp;IFACE;rxpck/s;txpck/s;rxkB/s;txkB/s;rxcmp/s;txcmp/s;rxmcst/s;%ifutil
-                     SysstatDataType.NET: (3, 7, 8),
-                     # hostname;interval;timestamp;tps;rtps;wtps;bread/s;bwrtn/s
-                     SysstatDataType.IO: (3, 7, 8)}
-    indexes = dtype_indexes[dtype]
+    with open(output_filepath, "rt") as output_file:
+      columns = output_file.readline()[2:-1].split(";")
+    dtype_columns = {SysstatDataType.LOAD: ("timestamp", "ldavg-5"),
+                     SysstatDataType.CPU: ("timestamp", "%user", "%nice", "%system", "%iowait", "%steal", "%idle"),
+                     SysstatDataType.MEM: ("timestamp", "kbmemused", "kbbuffers", "kbcached", "kbcommit", "kbactive", "kbdirty"),
+                     SysstatDataType.SWAP: ("timestamp", "%swpused"),
+                     SysstatDataType.NET: ("timestamp", "rxkB/s", "txkB/s"),
+                     SysstatDataType.IO: ("timestamp", "bread/s", "bwrtn/s")}
+    indexes = __class__.getColumnIndexes(dtype_columns[dtype], columns)
 
     return indexes, net_output_filepaths
+
+  @staticmethod
+  def getColumnIndexes(needed_column_names, column_names):
+    indexes = []
+    for needed_column_name in needed_column_names:
+      indexes.append(column_names.index(needed_column_name) + 1)  # gnuplot indexes start at 1
+    return tuple(indexes)
 
 
 class Plotter:

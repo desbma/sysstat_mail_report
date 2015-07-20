@@ -186,7 +186,9 @@ class SysstatData:
     if dtype is SysstatDataType.NET:
       # split file by interface
       with open(output_filepath, "rt") as output_file:
-        next(output_file)  # skip first line
+        # skip first line(s)
+        next(itertools.dropwhile(lambda x: not x.startswith("#"), output_file))
+        next(output_file)
         for line in output_file:
           itf = line.split(";", 5)[3]
           if itf in net_output_filepaths:
@@ -206,7 +208,8 @@ class SysstatData:
               itf_files[itf].write(line)
 
     with open(output_filepath, "rt") as output_file:
-      columns = output_file.readline()[2:-1].split(";")
+      line = next(itertools.dropwhile(lambda x: not x.startswith("#"), output_file))
+      columns = line[2:-1].split(";")
     dtype_columns = {SysstatDataType.LOAD: ("timestamp", "ldavg-5"),
                      SysstatDataType.CPU: ("timestamp", "%user", "%nice", "%system", "%iowait", "%steal", "%idle"),
                      SysstatDataType.MEM: ("timestamp", "kbmemused", "kbbuffers", "kbcached", "kbcommit", "kbactive", "kbdirty"),

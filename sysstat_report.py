@@ -86,11 +86,11 @@ def format_email(exp, dest, subject, header_text, img_format, img_filepaths, alt
   msg["To"] = dest
 
   # html
-  html = "<html><head></head><body>"
+  html = ["<html><head></head><body>"]
   if header_text is not None:
-    html += "<pre>%s</pre><br>" % (header_text)
+    html.append("<pre>%s</pre><br>" % (header_text))
   if img_format is GraphFormat.PNG:
-    html += "<br>".join("<img src=\"cid:img%u\">" % (i) for i in range(len(img_filepaths)))
+    html.append("<br>".join("<img src=\"cid:img%u\">" % (i) for i in range(len(img_filepaths))))
   elif img_format is GraphFormat.SVG:
     # inline SVG seems to be better supported that usual attachement approach
     for img_filepath in img_filepaths:
@@ -98,8 +98,9 @@ def format_email(exp, dest, subject, header_text, img_format, img_filepaths, alt
         data = img_file.read()
       data = base64.b64encode(data).decode("ascii")
       if img_filepath is not img_filepath[0]:
-        html += "<br>"
-      html += "<img src=\"data:image/svg+xml;base64,%s\">" % (data)
+        html.append("<br>")
+      html.append("<img src=\"data:image/svg+xml;base64,%s\">" % (data))
+  html = "".join(html)
   html = email.mime.text.MIMEText(html, "html")
 
   # alternate text
@@ -349,7 +350,8 @@ class Plotter:
     gnuplot_code.append("plot %s" % (", ".join(plot_cmds)))
 
     # run gnuplot
-    gnuplot_code = ";\n".join(gnuplot_code) + ";"
+    gnuplot_code[-1] += ";"
+    gnuplot_code = ";\n".join(gnuplot_code)
     subprocess.check_output(("gnuplot",),
                             input=gnuplot_code,
                             stderr=None if logging.getLogger().isEnabledFor(logging.DEBUG) else subprocess.DEVNULL,

@@ -254,7 +254,7 @@ class Plotter:
       gnuplot_code.extend(("set terminal dumb 110,25",
                            "set output '%s'" % (output_filepath)))
     else:
-      gnuplot_code.extend(("set terminal png size 780,400 font 'Liberation,9'",
+      gnuplot_code.extend(("set terminal png transparent size 780,400 font 'Liberation,9'",
                            "set output '%s'" % (output_filepath)))
 
     # input data setup

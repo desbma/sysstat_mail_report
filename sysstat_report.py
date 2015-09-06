@@ -3,6 +3,7 @@
 """ Generate and send a sysstat mail report. """
 
 import argparse
+import base64
 import bz2
 import calendar
 import contextlib
@@ -25,6 +26,7 @@ import time
 
 ReportType = enum.Enum("ReportType", ("DAILY", "WEEKLY", "MONTHLY"))
 SysstatDataType = enum.Enum("SysstatDataType", ("LOAD", "CPU", "MEM", "SWAP", "NET", "IO"))
+GraphFormat = enum.Enum("GraphFormat", ("TXT", "PNG", "SVG"))
 
 HAS_OPTIPNG = shutil.which("optipng") is not None
 
@@ -74,8 +76,10 @@ def get_reboot_times():
   return reboot_times
 
 
-def format_email(exp, dest, subject, header_text, img_filepaths, alternate_text_filepaths):
+def format_email(exp, dest, subject, header_text, img_format, img_filepaths, alternate_text_filepaths):
   """ Format a MIME email with attached images and alternate text, and return email code. """
+  assert(img_format in (GraphFormat.PNG, GraphFormat.SVG))
+
   msg = email.mime.multipart.MIMEMultipart("related")
   msg["Subject"] = subject
   msg["From"] = exp
@@ -85,7 +89,17 @@ def format_email(exp, dest, subject, header_text, img_filepaths, alternate_text_
   html = "<html><head></head><body>"
   if header_text is not None:
     html += "<pre>%s</pre><br>" % (header_text)
-  html += "<br>".join("<img src=\"cid:img%u\">" % (i) for i in range(len(img_filepaths)))
+  if img_format is GraphFormat.PNG:
+    html += "<br>".join("<img src=\"cid:img%u\">" % (i) for i in range(len(img_filepaths)))
+  elif img_format is GraphFormat.SVG:
+    # inline SVG seems to be better supported that usual attachement approach
+    for img_filepath in img_filepaths:
+      with open(img_filepath, "rb") as img_file:
+        data = img_file.read()
+      data = base64.b64encode(data).decode("ascii")
+      if img_filepath is not img_filepath[0]:
+        html += "<br>"
+      html += "<img src=\"data:image/svg+xml;base64,%s\">" % (data)
   html = email.mime.text.MIMEText(html, "html")
 
   # alternate text
@@ -105,11 +119,12 @@ def format_email(exp, dest, subject, header_text, img_filepaths, alternate_text_
   msg_alt.attach(html)
   msg.attach(msg_alt)
 
-  for i, img_filepath in enumerate(img_filepaths):
-    with open(img_filepath, "rb") as img_file:
-      msg_img = email.mime.image.MIMEImage(img_file.read())
-    msg_img.add_header("Content-ID", "<img%u>" % (i))
-    msg.attach(msg_img)
+  if img_format is GraphFormat.PNG:
+    for i, img_filepath in enumerate(img_filepaths):
+      with open(img_filepath, "rb") as img_file:
+        msg_img = email.mime.image.MIMEImage(img_file.read())
+      msg_img.add_header("Content-ID", "<img%u>" % (i))
+      msg.attach(msg_img)
 
   return msg.as_string()
 
@@ -235,26 +250,21 @@ class Plotter:
     assert(report_type in ReportType)
     self.report_type = report_type
 
-  def plotToPng(self, data_filepaths, data_indexes, data_type, reboot_times, output_filepath, smooth, *, title,
-                data_titles, ylabel, yrange):
-    self.__plot(data_filepaths, data_indexes, data_type, reboot_times, output_filepath, smooth, False, title,
-                data_titles, ylabel, yrange)
+  def plot(self, format, data_filepaths, data_indexes, data_type, reboot_times, output_filepath, smooth, title,
+           data_titles, ylabel, yrange):
+    assert(format in GraphFormat)
 
-  def plotToText(self, data_filepaths, data_indexes, data_type, reboot_times, output_filepath, smooth, *, title,
-                 data_titles, ylabel, yrange):
-    self.__plot(data_filepaths, data_indexes, data_type, reboot_times, output_filepath, smooth, True, title,
-                data_titles, ylabel, yrange)
-
-  def __plot(self, data_filepaths, data_indexes, data_type, reboot_times, output_filepath, smooth, text, title,
-             data_titles, ylabel, yrange):
     gnuplot_code = []
 
     # output setup
-    if text:
+    if format is GraphFormat.TXT:
       gnuplot_code.extend(("set terminal dumb 110,25",
                            "set output '%s'" % (output_filepath)))
-    else:
+    elif format is GraphFormat.PNG:
       gnuplot_code.extend(("set terminal png transparent size 780,400 font 'Liberation,9'",
+                           "set output '%s'" % (output_filepath)))
+    elif format is GraphFormat.SVG:
+      gnuplot_code.extend(("set terminal svg size 780,400 font 'Liberation,9'",
                            "set output '%s'" % (output_filepath)))
 
     # input data setup
@@ -346,11 +356,10 @@ class Plotter:
                             universal_newlines=True)
 
     # output post processing
-    if not text:
-      if HAS_OPTIPNG:
-        logging.getLogger().debug("Crunching '%s'..." % (output_filepath))
-        subprocess.check_call(("optipng", "-quiet", "-o", "1", output_filepath))
-    else:
+    if format is GraphFormat.PNG and HAS_OPTIPNG:
+      logging.getLogger().debug("Crunching '%s'..." % (output_filepath))
+      subprocess.check_call(("optipng", "-quiet", "-o", "1", output_filepath))
+    if format is GraphFormat.TXT:
       # remove first 2 bytes as they cause problems with emails
       with open(output_filepath, "rt") as output_file:
         output_file.seek(2)
@@ -370,6 +379,12 @@ if __name__ == "__main__":
                           help="Mail sender")
   arg_parser.add_argument("mail_to",
                           help="Mail destination")
+  arg_parser.add_argument("-s",
+                          "--svg",
+                          action="store_true",
+                          default=False,
+                          dest="svg",
+                          help="Use SVG instead of PNG for images (breaks rendering for some email clients)")
   arg_parser.add_argument("-v",
                           "--verbosity",
                           choices=("warning", "normal", "debug"),
@@ -377,6 +392,7 @@ if __name__ == "__main__":
                           dest="verbosity",
                           help="Level of output to display")
   args = arg_parser.parse_args()
+  img_format = GraphFormat.SVG if args.svg else GraphFormat.PNG
 
   # setup logger
   logging_level = {"warning": logging.WARNING,
@@ -386,7 +402,7 @@ if __name__ == "__main__":
                       format="%(asctime)s %(levelname)s %(message)s")
 
   # display warning if optipng is missing
-  if not HAS_OPTIPNG:
+  if (not args.svg) and (not HAS_OPTIPNG):
     logging.getLogger().warning("optipng could not be found, PNG crunching will be disabled")
 
   # do the job
@@ -431,8 +447,8 @@ if __name__ == "__main__":
                                       "ylabel": "Activity (MB/s)",
                                       "yrange": (0, None)}}
 
-    png_filepaths = []
-    txt_filepaths = []
+    graph_filepaths = {GraphFormat.TXT: [],
+                       img_format: []}
 
     reboot_times = get_reboot_times()
 
@@ -444,27 +460,20 @@ if __name__ == "__main__":
       if not data_filepaths:
         data_filepaths = {"": data_filepath}
 
-      # png
-      logging.getLogger().info("Generating %s PNG report..." % (data_type.name))
-      png_filepaths.append(os.path.join(temp_dir, "%s.png" % (data_type.name.lower())))
-      plotter.plotToPng(data_filepaths,
-                        indexes,
-                        data_type,
-                        reboot_times,
-                        png_filepaths[-1],
-                        report_type is not ReportType.DAILY,
-                        **plot_args[data_type])
-
-      # text
-      logging.getLogger().info("Generating %s text report..." % (data_type.name))
-      txt_filepaths.append(os.path.join(temp_dir, "%s.txt" % (data_type.name.lower())))
-      plotter.plotToText(data_filepaths,
-                         indexes,
-                         data_type,
-                         reboot_times,
-                         txt_filepaths[-1],
-                         report_type is not ReportType.DAILY,
-                         **plot_args[data_type])
+      # plot graph
+      for graph_format in (GraphFormat.TXT, img_format):
+        logging.getLogger().info("Generating %s %s report..." % (data_type.name, graph_format.name))
+        graph_filepaths[graph_format].append(os.path.join(temp_dir,
+                                                          "%s.%s" % (data_type.name.lower(),
+                                                                     graph_format.name.lower())))
+        plotter.plot(graph_format,
+                     data_filepaths,
+                     indexes,
+                     data_type,
+                     reboot_times,
+                     graph_filepaths[graph_format][-1],
+                     report_type is not ReportType.DAILY,
+                     **plot_args[data_type])
 
     # send mail
     logging.getLogger().info("Formatting email...")
@@ -472,8 +481,9 @@ if __name__ == "__main__":
                               args.mail_to,
                               "Sysstat %s report" % (report_type.name.lower()),
                               None,
-                              png_filepaths,
-                              txt_filepaths)
+                              img_format,
+                              graph_filepaths[img_format],
+                              graph_filepaths[GraphFormat.TXT])
 
     real_mail_from = email.utils.parseaddr(args.mail_from)[1]
     real_mail_to = email.utils.parseaddr(args.mail_to)[1]

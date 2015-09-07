@@ -3,7 +3,6 @@
 """ Generate and send a sysstat mail report. """
 
 import argparse
-import base64
 import bz2
 import calendar
 import contextlib
@@ -14,6 +13,7 @@ import email.mime.text
 import email.utils
 import enum
 import inspect
+import io
 import itertools
 import logging
 import os
@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import xml.etree.ElementTree
 
 
 ReportType = enum.Enum("ReportType", ("DAILY", "WEEKLY", "MONTHLY"))
@@ -92,14 +93,22 @@ def format_email(exp, dest, subject, header_text, img_format, img_filepaths, alt
   if img_format is GraphFormat.PNG:
     html.append("<br>".join("<img src=\"cid:img%u\">" % (i) for i in range(len(img_filepaths))))
   elif img_format is GraphFormat.SVG:
-    # inline SVG seems to be better supported that usual attachement approach
+    xml.etree.ElementTree.register_namespace("", "http://www.w3.org/2000/svg")
     for img_filepath in img_filepaths:
-      with open(img_filepath, "rb") as img_file:
-        data = img_file.read()
-      data = base64.b64encode(data).decode("ascii")
+      # parse xml to remove title tags and minify
+      tree = xml.etree.ElementTree.parse(img_filepath)
+      root = tree.getroot()
+      ns = root.tag.rsplit("}", 1)[0][1:]
+      for e in root.findall(".//{%s}title/.." % (ns)):
+        for se in e.findall("{%s}title" % (ns)):
+          e.remove(se)
+      with io.StringIO() as tmp:
+        tree.write(tmp, encoding="unicode", xml_declaration=False)
+        tmp.seek(0)
+        data = "".join(map(str.strip, tmp.readlines()))
       if img_filepath is not img_filepath[0]:
         html.append("<br>")
-      html.append("<img src=\"data:image/svg+xml;base64,%s\">" % (data))
+      html.append(data)
   html = "".join(html)
   html = email.mime.text.MIMEText(html, "html")
 

@@ -260,8 +260,8 @@ class Plotter:
     assert(report_type in ReportType)
     self.report_type = report_type
 
-  def plot(self, format, data_filepaths, data_indexes, data_type, reboot_times, output_filepath, smooth, title,
-           data_titles, ylabel, yrange):
+  def plot(self, format, img_size, data_filepaths, data_indexes, data_type, reboot_times, output_filepath, smooth,
+           title, data_titles, ylabel, yrange):
     assert(format in GraphFormat)
 
     gnuplot_code = []
@@ -271,10 +271,10 @@ class Plotter:
       gnuplot_code.extend(("set terminal dumb 110,25",
                            "set output '%s'" % (output_filepath)))
     elif format is GraphFormat.PNG:
-      gnuplot_code.extend(("set terminal png transparent size 780,400 font 'Liberation,9'",
+      gnuplot_code.extend(("set terminal png transparent size %u,%u font 'Liberation,9'" % tuple(img_size),
                            "set output '%s'" % (output_filepath)))
     elif format is GraphFormat.SVG:
-      gnuplot_code.extend(("set terminal svg size 780,400 font 'Liberation,9'",
+      gnuplot_code.extend(("set terminal svg size %u,%u font 'Liberation,9'" % tuple(img_size),
                            "set output '%s'" % (output_filepath)))
 
     # input data setup
@@ -390,12 +390,26 @@ if __name__ == "__main__":
                           help="Mail sender")
   arg_parser.add_argument("mail_to",
                           help="Mail destination")
+  arg_parser.add_argument("-d",
+                          "--graph-data",
+                          choices=tuple(t.name.lower() for t in SysstatDataType),
+                          default=tuple(t.name.lower() for t in SysstatDataType),
+                          nargs="+",
+                          dest="data_type",
+                          help="Data to graph")
   arg_parser.add_argument("-s",
-                          "--svg",
-                          action="store_true",
-                          default=False,
-                          dest="svg",
-                          help="Use SVG instead of PNG for images (breaks rendering for some email clients)")
+                          "--img-size",
+                          type=int,
+                          nargs=2,
+                          default=(780, 400),
+                          dest="img_size",
+                          help="Graph image size")
+  arg_parser.add_argument("-f",
+                          "--img-format",
+                          choices=tuple(t.name.lower() for t in tuple(GraphFormat)[1:]),
+                          default=GraphFormat.PNG.name.lower(),
+                          dest="img_format",
+                          help="Image format to use (SVG breaks rendering for some email clients)")
   arg_parser.add_argument("-v",
                           "--verbosity",
                           choices=("warning", "normal", "debug"),
@@ -403,7 +417,8 @@ if __name__ == "__main__":
                           dest="verbosity",
                           help="Level of output to display")
   args = arg_parser.parse_args()
-  img_format = GraphFormat.SVG if args.svg else GraphFormat.PNG
+  args.data_type = tuple(SysstatDataType[dt.upper()] for dt in args.data_type)
+  args.img_format = GraphFormat[args.img_format.upper()]
 
   # setup logger
   logging_level = {"warning": logging.WARNING,
@@ -413,7 +428,7 @@ if __name__ == "__main__":
                       format="%(asctime)s %(levelname)s %(message)s")
 
   # display warning if optipng is missing
-  if (not args.svg) and (not HAS_OPTIPNG):
+  if (args.img_format is GraphFormat.PNG) and (not HAS_OPTIPNG):
     logging.getLogger().warning("optipng could not be found, PNG crunching will be disabled")
 
   # do the job
@@ -459,11 +474,11 @@ if __name__ == "__main__":
                                       "yrange": (0, None)}}
 
     graph_filepaths = {GraphFormat.TXT: [],
-                       img_format: []}
+                       args.img_format: []}
 
     reboot_times = get_reboot_times()
 
-    for data_type in SysstatDataType:
+    for data_type in args.data_type:
       # data
       logging.getLogger().info("Extracting %s data..." % (data_type.name))
       data_filepath = os.path.join(temp_dir, "%s.csv" % (data_type.name.lower()))
@@ -472,12 +487,13 @@ if __name__ == "__main__":
         data_filepaths = {"": data_filepath}
 
       # plot graph
-      for graph_format in (GraphFormat.TXT, img_format):
+      for graph_format in (GraphFormat.TXT, args.img_format):
         logging.getLogger().info("Generating %s %s report..." % (data_type.name, graph_format.name))
         graph_filepaths[graph_format].append(os.path.join(temp_dir,
                                                           "%s.%s" % (data_type.name.lower(),
                                                                      graph_format.name.lower())))
         plotter.plot(graph_format,
+                     args.img_size,
                      data_filepaths,
                      indexes,
                      data_type,
@@ -492,8 +508,8 @@ if __name__ == "__main__":
                               args.mail_to,
                               "Sysstat %s report" % (report_type.name.lower()),
                               None,
-                              img_format,
-                              graph_filepaths[img_format],
+                              args.img_format,
+                              graph_filepaths[args.img_format],
                               graph_filepaths[GraphFormat.TXT])
 
     real_mail_from = email.utils.parseaddr(args.mail_from)[1]

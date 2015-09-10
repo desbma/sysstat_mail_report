@@ -77,6 +77,23 @@ def get_reboot_times():
   return reboot_times
 
 
+def minify_svg(svg_filepath):
+  """ Open a SVG file, and return its minified content as a string. """
+  xml.etree.ElementTree.register_namespace("", "http://www.w3.org/2000/svg")
+  tree = xml.etree.ElementTree.parse(svg_filepath)
+  root = tree.getroot()
+  ns = root.tag.rsplit("}", 1)[0][1:]
+  # remove title tags
+  for e in root.findall(".//{%s}title/.." % (ns)):
+    for se in e.findall("{%s}title" % (ns)):
+      e.remove(se)
+  with io.StringIO() as tmp:
+    tree.write(tmp, encoding="unicode", xml_declaration=False)
+    tmp.seek(0)
+    data = "".join(map(str.strip, tmp.readlines()))
+  return data
+
+
 def format_email(exp, dest, subject, header_text, img_format, img_filepaths, alternate_text_filepaths):
   """ Format a MIME email with attached images and alternate text, and return email code. """
   assert(img_format in (GraphFormat.PNG, GraphFormat.SVG))
@@ -93,21 +110,10 @@ def format_email(exp, dest, subject, header_text, img_format, img_filepaths, alt
   if img_format is GraphFormat.PNG:
     html.append("<br>".join("<img src=\"cid:img%u\">" % (i) for i in range(len(img_filepaths))))
   elif img_format is GraphFormat.SVG:
-    xml.etree.ElementTree.register_namespace("", "http://www.w3.org/2000/svg")
     for img_filepath in img_filepaths:
-      # parse xml to remove title tags and minify
-      tree = xml.etree.ElementTree.parse(img_filepath)
-      root = tree.getroot()
-      ns = root.tag.rsplit("}", 1)[0][1:]
-      for e in root.findall(".//{%s}title/.." % (ns)):
-        for se in e.findall("{%s}title" % (ns)):
-          e.remove(se)
-      with io.StringIO() as tmp:
-        tree.write(tmp, encoding="unicode", xml_declaration=False)
-        tmp.seek(0)
-        data = "".join(map(str.strip, tmp.readlines()))
       if img_filepath is not img_filepath[0]:
         html.append("<br>")
+      data = minify_svg(img_filepath)
       html.append(data)
   html = "".join(html)
   html = email.mime.text.MIMEText(html, "html")

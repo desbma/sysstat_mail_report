@@ -145,11 +145,16 @@ def format_email(exp, dest, subject, header_text, img_format, img_filepaths, alt
   return msg.as_string()
 
 
-def bz_decompress(bz2_filepath, new_filepath):
-  logging.getLogger().debug("Decompressing '%s' to '%s'..." % (bz2_filepath, new_filepath))
-  with bz2.open(bz2_filepath, "rb") as bz2_file, \
-          open(new_filepath, "wb") as new_file:
-    shutil.copyfileobj(bz2_file, new_file)
+def decompress(in_filepath, out_filepath):
+  """ Decompress gzip or bzip2 input file to output file. """
+  logging.getLogger().debug("Decompressing '%s' to '%s'..." % (in_filepath, out_filepath))
+  with contextlib.ExitStack() as cm:
+    if os.path.splitext(in_filepath)[1].lower() == ".gz":
+      in_file = cm.enter_context(gzip.open(in_filepath, "rb"))
+    elif os.path.splitext(in_filepath)[1].lower() == ".bz2":
+      in_file = cm.enter_context(bz2.open(in_filepath, "rb"))
+    out_file = cm.enter_context(open(out_filepath, "wb"))
+    shutil.copyfileobj(in_file, out_file)
 
 
 class SysstatData:
@@ -169,10 +174,13 @@ class SysstatData:
       for i in range(7, 0, -1):
         date = today - datetime.timedelta(days=i)
         filepath = date.strftime("/var/log/sysstat/%Y%m/sa%d")
+        compressed_filepaths = ("%s.gz" % (filepath), "%s.bz2" % (filepath))
         if not os.path.isfile(filepath):
-          bz2_filepath = "%s.bz2" % (filepath)
-          filepath = os.path.join(temp_dir, os.path.basename(filepath))
-          bz_decompress(bz2_filepath, filepath)
+          for compressed_filepath in compressed_filepaths:
+            if os.path.isfile(compressed_filepath):
+              filepath = os.path.join(temp_dir, os.path.basename(filepath))
+              decompress(compressed_filepath, filepath)
+              break
         self.sa_filepaths.append(filepath)
 
     elif report_type is ReportType.MONTHLY:
@@ -184,10 +192,13 @@ class SysstatData:
         month = today.month - 1
       for day in range(1, calendar.monthrange(year, month)[1] + 1):
         filepath = "/var/log/sysstat/%04u%02u/sa%02u" % (year, month, day)
+        compressed_filepaths = ("%s.gz" % (filepath), "%s.bz2" % (filepath))
         if not os.path.isfile(filepath):
-          bz2_filepath = "%s.bz2" % (filepath)
-          filepath = os.path.join(temp_dir, os.path.basename(filepath))
-          bz_decompress(bz2_filepath, filepath)
+          for compressed_filepath in compressed_filepaths:
+            if os.path.isfile(compressed_filepath):
+              filepath = os.path.join(temp_dir, os.path.basename(filepath))
+              decompress(compressed_filepath, filepath)
+              break
         self.sa_filepaths.append(filepath)
 
   def generateData(self, dtype, output_filepath):

@@ -12,6 +12,7 @@ import email.mime.multipart
 import email.mime.text
 import email.utils
 import enum
+import gzip
 import inspect
 import io
 import itertools

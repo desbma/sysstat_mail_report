@@ -457,7 +457,7 @@ if __name__ == "__main__":
     plot_args = {SysstatDataType.LOAD: {"title": "Load",
                                         "data_titles": ("ldavg-5",),
                                         "ylabel": "5min load average",
-                                        "yrange": (0, None)},
+                                        "yrange": (0, "%u<*" % (os.cpu_count()))},
                  SysstatDataType.CPU: {"title": "CPU",
                                        "data_titles": ("user",
                                                        "nice",

@@ -202,6 +202,37 @@ class SysstatData:
               break
         self.sa_filepaths.append(filepath)
 
+  def generateRawCsv(self, dtype, sa_filepath, output_file):
+    """ Extract stats from sa file and write them in CSV format to text file. """
+    cmd = ["sadf", "-d", "-U", "--"]
+    dtype_cmd = {SysstatDataType.LOAD: ("-q",),
+                 SysstatDataType.CPU: ("-u",),
+                 SysstatDataType.MEM: ("-r",),
+                 SysstatDataType.SWAP: ("-S",),
+                 SysstatDataType.NET: ("-n", "DEV"),
+                 SysstatDataType.IO: ("-b",)}
+    cmd.extend(dtype_cmd[dtype])
+    cmd.append(sa_filepath)
+    subprocess.check_call(cmd, stdout=output_file, universal_newlines=True)
+
+  def getCsvColumns(self, csv_file):
+    """ Extract column names from CSV file. """
+    line = next(itertools.dropwhile(lambda x: not x.startswith("#"), csv_file))
+    columns = line[2:-1].split(";")
+    return columns
+
+  def filterRawCsv(self, in_file, out_file):
+    """ Filter CSV file by removing lines that gnuplot would not parse. """
+    for line in in_file:
+      if line.startswith("#"):
+        # comment lines are correctly ignored by gnuplot, but we remove them for clarity
+        # (they can appear several times and in the middle of the CSV file if a reboot occurs)
+        continue
+      fields = line.rstrip().split(";")
+      if int(fields[1] == -1):  # fields[3] == "LINUX-RESTART"
+        continue
+      out_file.write(line)
+
   def generateData(self, dtype, output_filepath):
     """
     Generate data to plot (';' separated values).
@@ -211,38 +242,25 @@ class SysstatData:
     """
     assert(dtype in SysstatDataType)
     net_output_filepaths = {}
+    columns = None
 
-    for sa_filepath in self.sa_filepaths:
-      cmd = ["sadf", "-d", "-U", "--"]
-      dtype_cmd = {SysstatDataType.LOAD: ("-q",),
-                   SysstatDataType.CPU: ("-u",),
-                   SysstatDataType.MEM: ("-r",),
-                   SysstatDataType.SWAP: ("-S",),
-                   SysstatDataType.NET: ("-n", "DEV"),
-                   SysstatDataType.IO: ("-b",)}
-      cmd.extend(dtype_cmd[dtype])
-      cmd.append(sa_filepath)
-      with tempfile.TemporaryFile("w+t",
-                                  prefix="%s_" % (dtype.name.lower()),
-                                  suffix=".csv",
-                                  dir=os.path.dirname(output_filepath)) as tmp_file:
-        subprocess.check_call(cmd, stdout=tmp_file, universal_newlines=True)
-        # append data and remove invalid lines
-        tmp_file.seek(0)
-        with open(output_filepath, "at") as output_file:
-          for line in tmp_file:
-            if not line.startswith("#"):  # comment lines are correctly ignored by gnuplot
-              fields = line.rstrip().split(";")
-              if fields[3] == "LINUX-RESTART":
-                continue
-            output_file.write(line)
+    with open(output_filepath, "wt") as output_file:
+      for sa_filepath in self.sa_filepaths:
+        with tempfile.TemporaryFile("w+t",
+                                    prefix="%s_" % (dtype.name.lower()),
+                                    suffix=".csv",
+                                    dir=os.path.dirname(output_filepath)) as tmp_file:
+          self.generateRawCsv(dtype, sa_filepath, tmp_file)
+          if columns is None:
+            tmp_file.seek(0)
+            columns = self.getCsvColumns(tmp_file)
+          # append data and remove invalid lines
+          tmp_file.seek(0)
+          self.filterRawCsv(tmp_file, output_file)
 
     if dtype is SysstatDataType.NET:
       # split file by interface
       with open(output_filepath, "rt") as output_file:
-        # skip first line(s)
-        next(itertools.dropwhile(lambda x: not x.startswith("#"), output_file))
-        next(output_file)
         for line in output_file:
           itf = line.split(";", 5)[3]
           if itf in net_output_filepaths:
@@ -261,9 +279,6 @@ class SysstatData:
             if itf in itf_files:
               itf_files[itf].write(line)
 
-    with open(output_filepath, "rt") as output_file:
-      line = next(itertools.dropwhile(lambda x: not x.startswith("#"), output_file))
-      columns = line[2:-1].split(";")
     dtype_columns = {SysstatDataType.LOAD: ("timestamp", "ldavg-5"),
                      SysstatDataType.CPU: ("timestamp", "%user", "%nice", "%system", "%iowait", "%steal", "%idle"),
                      SysstatDataType.MEM: ("timestamp", "kbmemused", "kbbuffers", "kbcached", "kbcommit", "kbactive", "kbdirty"),

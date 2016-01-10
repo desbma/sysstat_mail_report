@@ -222,8 +222,20 @@ class SysstatData:
                    SysstatDataType.IO: ("-b",)}
       cmd.extend(dtype_cmd[dtype])
       cmd.append(sa_filepath)
-      with open(output_filepath, "ab") as output_file:
-        subprocess.check_call(cmd, stdout=output_file)
+      with tempfile.TemporaryFile("w+t",
+                                  prefix="%s_" % (dtype.name.lower()),
+                                  suffix=".csv",
+                                  dir=os.path.dirname(output_filepath)) as tmp_file:
+        subprocess.check_call(cmd, stdout=tmp_file, universal_newlines=True)
+        # append data and remove invalid lines
+        tmp_file.seek(0)
+        with open(output_filepath, "at") as output_file:
+          for line in tmp_file:
+            if not line.startswith("#"):  # comment lines are correctly ignored by gnuplot
+              fields = line.rstrip().split(";")
+              if fields[3] == "LINUX-RESTART":
+                continue
+            output_file.write(line)
 
     if dtype is SysstatDataType.NET:
       # split file by interface

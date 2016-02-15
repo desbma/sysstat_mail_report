@@ -28,19 +28,19 @@ This tool attempts to be simple and efficient and allow generating periodic repo
 Click images to see full size.
 
 Daily CPU graph:  
-[![Daily CPU graph](http://i.imgur.com/qyTeBFsm.png)](http://i.imgur.com/qyTeBFs.png)
+[![Daily CPU graph](https://i.imgur.com/qyTeBFsm.png)](https://i.imgur.com/qyTeBFs.png)
 
 Daily memory graph:  
-[![Daily memory graph](http://i.imgur.com/W3uvwtMm.png)](http://i.imgur.com/W3uvwtM.png)
+[![Daily memory graph](https://i.imgur.com/W3uvwtMm.png)](https://i.imgur.com/W3uvwtM.png)
 
 Daily network graph:  
-[![Daily network graph](http://i.imgur.com/yZ8zKEMm.png)](http://i.imgur.com/yZ8zKEM.png)
+[![Daily network graph](https://i.imgur.com/yZ8zKEMm.png)](https://i.imgur.com/yZ8zKEM.png)
 
 Daily IO graph:  
-[![Daily IO graph](http://i.imgur.com/sCEZ773m.png)](http://i.imgur.com/sCEZ773.png)
+[![Daily IO graph](https://i.imgur.com/sCEZ773m.png)](https://i.imgur.com/sCEZ773.png)
 
 Weekly network graph:  
-[![Weekly network graph](http://i.imgur.com/pYRv26Em.png)](http://i.imgur.com/pYRv26E.png)
+[![Weekly network graph](https://i.imgur.com/pYRv26Em.png)](https://i.imgur.com/pYRv26E.png)
 
 
 ## Dependencies

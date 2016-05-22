@@ -164,25 +164,39 @@ class SysstatData:
 
   def __init__(self, report_type, temp_dir):
     assert(report_type in ReportType)
+    self.report_type = report_type
     self.sa_filepaths = []
     today = datetime.date.today()
 
     if report_type is ReportType.DAILY:
       date = today - datetime.timedelta(days=1)
-      self.sa_filepaths.append("/var/log/sysstat/sa%02u" % (date.day))
+      filepath = "/var/log/sysstat/sa%02u" % (date.day)
+      if os.path.isfile(filepath):
+        self.sa_filepaths.append(filepath)
+      else:
+        logging.getLogger().warning("No sysstat data file for date %s" % (date))
 
     elif report_type is ReportType.WEEKLY:
       for i in range(7, 0, -1):
         date = today - datetime.timedelta(days=i)
-        filepath = date.strftime("/var/log/sysstat/%Y%m/sa%d")
-        compressed_filepaths = ("%s.gz" % (filepath), "%s.bz2" % (filepath))
-        if not os.path.isfile(filepath):
-          for compressed_filepath in compressed_filepaths:
-            if os.path.isfile(compressed_filepath):
-              filepath = os.path.join(temp_dir, os.path.basename(filepath))
-              decompress(compressed_filepath, filepath)
-              break
-        self.sa_filepaths.append(filepath)
+        for week_subdir in (True, False):
+          if week_subdir:
+            filepath = date.strftime("/var/log/sysstat/%Y%m/sa%d")
+          else:
+            filepath = date.strftime("/var/log/sysstat/sa%d")
+          compressed_filepaths = ("%s.gz" % (filepath), "%s.bz2" % (filepath))
+          if not os.path.isfile(filepath):
+            for compressed_filepath in compressed_filepaths:
+              if os.path.isfile(compressed_filepath):
+                filepath = os.path.join(temp_dir, os.path.basename(filepath))
+                decompress(compressed_filepath, filepath)
+                break
+          if os.path.isfile(filepath):
+            break
+        if os.path.isfile(filepath):
+          self.sa_filepaths.append(filepath)
+        else:
+          logging.getLogger().warning("No sysstat data file for date %s" % (date))
 
     elif report_type is ReportType.MONTHLY:
       if today.month == 1:
@@ -200,7 +214,17 @@ class SysstatData:
               filepath = os.path.join(temp_dir, os.path.basename(filepath))
               decompress(compressed_filepath, filepath)
               break
-        self.sa_filepaths.append(filepath)
+        if os.path.isfile(filepath):
+          self.sa_filepaths.append(filepath)
+        else:
+          logging.getLogger().warning("No sysstat data file for date %04u/%02u/%02u" % (year, month, day))
+
+  def hasEnoughData(self):
+    """ Return True if enough sysstat data files have been found to plot something, False instead. """
+    if self.report_type is ReportType.DAILY:
+      return bool(self.sa_filepaths)
+    else:
+      return len(self.sa_filepaths) >= 2
 
   def generateRawCsv(self, dtype, sa_filepath, output_file):
     """ Extract stats from sa file and write them in CSV format to text file. """
@@ -229,7 +253,7 @@ class SysstatData:
         # (they can appear several times and in the middle of the CSV file if a reboot occurs)
         continue
       fields = line.rstrip().split(";")
-      if int(fields[1] == -1):  # fields[3] == "LINUX-RESTART"
+      if int(fields[1]) == -1:  # fields[3] == "LINUX-RESTART"
         continue
       out_file.write(line)
 
@@ -262,7 +286,10 @@ class SysstatData:
       # split file by interface
       with open(output_filepath, "rt") as output_file:
         for line in output_file:
-          itf = line.split(";", 5)[3]
+          fields = line.split(";", 5)
+          if int(fields[1]) == -1:  # fields[3] == "LINUX-RESTART"
+            continue
+          itf = fields[3]
           if itf in net_output_filepaths:
             # not a new interface
             break
@@ -275,7 +302,10 @@ class SysstatData:
           itf_files[itf] = ctx.enter_context(open(itf_filepath, "wt"))
         with open(output_filepath, "rt") as output_file:
           for line in output_file:
-            itf = line.split(";", 5)[3]
+            fields = line.split(";", 5)
+            if int(fields[1]) == -1:  # fields[3] == "LINUX-RESTART"
+              continue
+            itf = fields[3]
             if itf in itf_files:
               itf_files[itf].write(line)
 
@@ -480,6 +510,10 @@ if __name__ == "__main__":
   report_type = ReportType[args.report_type.upper()]
   with tempfile.TemporaryDirectory(prefix="%s_" % (os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe())))[0])) as temp_dir:
     sysstat_data = SysstatData(report_type, temp_dir)
+    if not sysstat_data.hasEnoughData():
+      logging.getLogger().error("Not enough data files")
+      exit(1)
+
     plotter = Plotter(report_type)
     plot_args = {SysstatDataType.LOAD: {"title": "Load",
                                         "data_titles": ("ldavg-5",),

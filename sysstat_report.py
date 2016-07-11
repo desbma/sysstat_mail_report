@@ -35,10 +35,9 @@ HAS_OPTIPNG = shutil.which("optipng") is not None
 
 def get_total_memory_mb():
   """ Return total amount of system RAM in MB. """
-  output = subprocess.check_output(("free", "-m"), universal_newlines=True)
-  output = output.splitlines()
-  mem_line = next(itertools.dropwhile(lambda x: not x.startswith("Mem:"), output))
-  total_mem = int(tuple(filter(None, map(str.strip, mem_line.split(" "))))[1])
+  with open("/proc/meminfo", "rt") as f:
+    total_line = next(itertools.dropwhile(lambda x: not x.startswith("MemTotal:"), f))
+  total_mem = int(tuple(filter(None, map(str.strip, total_line.split(" "))))[1]) // 1024
   logging.getLogger().info("Total amount of memory: %u MB" % (total_mem))
   return total_mem
 

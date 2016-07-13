@@ -428,7 +428,7 @@ class Plotter:
                                                                              data_indexes[0],
                                                                              time.localtime().tm_gmtoff,
                                                                              ydata,
-                                                                             "smooth csplines " if smooth else "",
+                                                                             "smooth bezier " if smooth else "",
                                                                              data_title))
     gnuplot_code.append("plot %s" % (", ".join(plot_cmds)))
 

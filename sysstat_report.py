@@ -72,7 +72,7 @@ def get_reboot_times():
       cmd = ("last", "-R", "reboot", "-f", log_filepath)
       output = subprocess.check_output(cmd, universal_newlines=True)
       output = output.splitlines()[0:-2]
-      date_regex = re.compile(".*boot\s*(.*) - .*$")
+      date_regex = re.compile(".*boot\s*([\w\s]*:\d{2}).*$")
       for l in output:
         date_str = date_regex.match(l).group(1).strip()
         # TODO remove fixed year

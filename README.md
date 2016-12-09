@@ -53,7 +53,7 @@ Weekly network graph:
 And of course [sysstat](http://sebastien.godard.pagesperso-orange.fr/).
 
 On Ubuntu and other Debian derivatives, you can install all of them with:  
-`sudo apt-get install sysstat python3.4 gnuplot-nox sendmail-bin optipng`
+`sudo apt-get install sysstat python3 gnuplot-nox sendmail-bin optipng`
 
 
 ## Installation
@@ -72,10 +72,10 @@ Stat files compressed with bzip2 are handled properly.
 
 ## Usage
 
-The recommand way of calling the script is through a cron job, so for example for a daily report, create the file `/etc/cron.daily/sysstat-report`, make it executable, and add the lines:
+The recommanded way of calling the script is through a cron job, so for example for a daily report, create the file `/etc/cron.daily/sysstat-report`, make it executable, and add the lines:
 
     #!/bin/sh
-    sysstat_report.py daily 'Sysstat <email.from@example.com>' 'email.to@example.com' -v warning
+    sysstat_report.py daily 'Sysstat <email.from@example.com>' 'email.to@example.com'
 
 When the script is called every day, you will receive an email with the graphs for the previous day.
 

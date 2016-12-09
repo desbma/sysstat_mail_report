@@ -44,15 +44,19 @@ def get_total_memory_mb():
 
 def get_max_network_speed():
   """ Get maximum Ethernet network interface speed in Mb/s. """
-  max_speed = -1
+  max_speed = 0
   interfaces = os.listdir("/sys/class/net")
   assert(len(interfaces) > 1)
   for interface in interfaces:
     if interface == "lo":
       continue
     filepath = "/sys/class/net/%s/speed" % (interface)
-    with open(filepath, "rt") as f:
-      new_speed = int(f.read())
+    try:
+      with open(filepath, "rt") as f:
+        new_speed = int(f.read())
+    except OSError:
+      logging.getLogger().warning("Unable to get speed of interface %s" % (interface))
+      continue
     logging.getLogger().debug("Speed of interface %s: %u Mb/s" % (interface, new_speed))
     max_speed = max(max_speed, new_speed)
   logging.getLogger().info("Maximum interface speed: %u Mb/s" % (max_speed))

@@ -119,6 +119,7 @@ def format_email(exp, dest, subject, header_text, img_format, img_filepaths, alt
         html.append("<br>")
       data = minify_svg(img_filepath)
       html.append(data)
+  html.append("</body></html>")
   html = "".join(html)
   html = email.mime.text.MIMEText(html, "html")
 

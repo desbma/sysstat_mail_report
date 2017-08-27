@@ -75,7 +75,7 @@ Stat files compressed with bzip2 are handled properly.
 The recommanded way of calling the script is through a cron job, so for example for a daily report, create the file `/etc/cron.daily/sysstat-report`, make it executable, and add the lines:
 
     #!/bin/sh
-    sysstat_report.py daily 'Sysstat <email.from@example.com>' 'email.to@example.com'
+    exec sysstat_report.py daily 'Sysstat <email.from@example.com>' 'email.to@example.com'
 
 When the script is called every day, you will receive an email with the graphs for the previous day.
 

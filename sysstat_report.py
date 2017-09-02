@@ -171,23 +171,28 @@ class SysstatData:
     self.report_type = report_type
     self.sa_filepaths = []
     today = datetime.date.today()
+    filepath_format_dd = "/var/log/sysstat/sa%d"
+    filepath_format_subdir = "/var/log/sysstat/%Y%m/sa%d"
+    filepath_format_yyyymmdd = "/var/log/sysstat/sa%Y%m%d"
 
     if report_type is ReportType.DAILY:
       date = today - datetime.timedelta(days=1)
-      filepath = "/var/log/sysstat/sa%02u" % (date.day)
+      filepath_formats = [filepath_format_dd, filepath_format_yyyymmdd]
+      for filepath_format in filepath_formats:
+        filepath = date.strftime(filepath_format)
+        if os.path.isfile(filepath):
+          break
       if os.path.isfile(filepath):
         self.sa_filepaths.append(filepath)
       else:
         logging.getLogger().warning("No sysstat data file for date %s" % (date))
 
     elif report_type is ReportType.WEEKLY:
+      filepath_formats = [filepath_format_yyyymmdd, filepath_format_subdir, filepath_format_dd]
       for i in range(7, 0, -1):
         date = today - datetime.timedelta(days=i)
-        for week_subdir in (True, False):
-          if week_subdir:
-            filepath = date.strftime("/var/log/sysstat/%Y%m/sa%d")
-          else:
-            filepath = date.strftime("/var/log/sysstat/sa%d")
+        for filepath_format in filepath_formats:
+          filepath = date.strftime(filepath_format)
           compressed_filepaths = ("%s.gz" % (filepath), "%s.bz2" % (filepath))
           if not os.path.isfile(filepath):
             for compressed_filepath in compressed_filepaths:
@@ -203,6 +208,7 @@ class SysstatData:
           logging.getLogger().warning("No sysstat data file for date %s" % (date))
 
     elif report_type is ReportType.MONTHLY:
+      filepath_formats = [filepath_format_subdir, filepath_format_yyyymmdd]
       if today.month == 1:
         year = today.year - 1
         month = 12
@@ -210,14 +216,18 @@ class SysstatData:
         year = today.year
         month = today.month - 1
       for day in range(1, calendar.monthrange(year, month)[1] + 1):
-        filepath = "/var/log/sysstat/%04u%02u/sa%02u" % (year, month, day)
-        compressed_filepaths = ("%s.gz" % (filepath), "%s.bz2" % (filepath))
-        if not os.path.isfile(filepath):
-          for compressed_filepath in compressed_filepaths:
-            if os.path.isfile(compressed_filepath):
-              filepath = os.path.join(temp_dir, os.path.basename(filepath))
-              decompress(compressed_filepath, filepath)
-              break
+        date = datetime.date(year, month, day)
+        for filepath_format in filepath_formats:
+          filepath = date.strftime(filepath_format)
+          compressed_filepaths = ("%s.gz" % (filepath), "%s.bz2" % (filepath))
+          if not os.path.isfile(filepath):
+            for compressed_filepath in compressed_filepaths:
+              if os.path.isfile(compressed_filepath):
+                filepath = os.path.join(temp_dir, os.path.basename(filepath))
+                decompress(compressed_filepath, filepath)
+                break
+          if os.path.isfile(filepath):
+            break
         if os.path.isfile(filepath):
           self.sa_filepaths.append(filepath)
         else:

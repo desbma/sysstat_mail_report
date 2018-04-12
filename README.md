@@ -67,7 +67,7 @@ Download it to `/usr/local/bin`, ie with:
 
 For the weekly and monthly reports to be generated properly, you may need to increase the value of `HISTORY` in `/etc/sysstat/sysstat`, to respectively at least 7 and 31.
 
-Stat files compressed with bzip2 are handled properly.
+Stat files compressed with gzip, bzip2 or xz are handled properly.
 
 
 ## Usage

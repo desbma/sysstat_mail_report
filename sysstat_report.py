@@ -17,6 +17,7 @@ import inspect
 import io
 import itertools
 import logging
+import lzma
 import os
 import re
 import shutil
@@ -167,7 +168,7 @@ class SysstatData:
       date = today - datetime.timedelta(days=1)
       filepath_formats = [filepath_format_dd, filepath_format_yyyymmdd]
       filepath = __class__.getSysstatDataFilepath(date, filepath_formats, temp_dir)
-      if filepath is not None::
+      if filepath is not None:
         self.sa_filepaths.append(filepath)
 
     elif report_type is ReportType.WEEKLY:
@@ -175,7 +176,7 @@ class SysstatData:
       for i in range(7, 0, -1):
         date = today - datetime.timedelta(days=i)
         filepath = __class__.getSysstatDataFilepath(date, filepath_formats, temp_dir)
-        if filepath is not None::
+        if filepath is not None:
           self.sa_filepaths.append(filepath)
 
     elif report_type is ReportType.MONTHLY:
@@ -189,18 +190,20 @@ class SysstatData:
       for day in range(1, calendar.monthrange(year, month)[1] + 1):
         date = datetime.date(year, month, day)
         filepath = __class__.getSysstatDataFilepath(date, filepath_formats, temp_dir)
-        if filepath is not None::
+        if filepath is not None:
           self.sa_filepaths.append(filepath)
 
   @staticmethod
   def decompress(in_filepath, out_filepath):
-    """ Decompress gzip or bzip2 input file to output file. """
+    """ Decompress gzip, bzip2, or lzma input file to output file. """
     logging.getLogger().debug("Decompressing '%s' to '%s'..." % (in_filepath, out_filepath))
     with contextlib.ExitStack() as cm:
       if os.path.splitext(in_filepath)[1].lower() == ".gz":
         in_file = cm.enter_context(gzip.open(in_filepath, "rb"))
       elif os.path.splitext(in_filepath)[1].lower() == ".bz2":
         in_file = cm.enter_context(bz2.open(in_filepath, "rb"))
+      elif os.path.splitext(in_filepath)[1].lower() == ".xz":
+        in_file = cm.enter_context(lzma.open(in_filepath, "rb"))
       out_file = cm.enter_context(open(out_filepath, "wb"))
       shutil.copyfileobj(in_file, out_file)
 
@@ -209,14 +212,14 @@ class SysstatData:
     """ Get data file path for requested date, by decompressing file in needed, return filepath or None if not found. """
     for filepath_format in filepath_formats:
       filepath = date.strftime(filepath_format)
-      compressed_filepaths = ("%s.gz" % (filepath), "%s.bz2" % (filepath))
       if not os.path.isfile(filepath):
+        compressed_filepaths = ("%s.%s" % (filepath, ext) for ext in ("gz", "bz2", "xz"))
         for compressed_filepath in compressed_filepaths:
           if os.path.isfile(compressed_filepath):
             filepath = os.path.join(temp_dir, os.path.basename(filepath))
             __class__.decompress(compressed_filepath, filepath)
-            break
-      if os.path.isfile(filepath):
+            return filepath
+      else:
         return filepath
     logging.getLogger().warning("No sysstat data file for date %s" % (date))
 

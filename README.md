@@ -10,7 +10,7 @@ This tool attempts to be simple and efficient and allow generating periodic repo
 
 ## Features
 
-* Allow generating daily/weekly/monthly reports
+* Allows generating daily/weekly/monthly reports
 * Generates graphs with data from 5min load average, CPU usage, memory usage, swap usage, network IO and drive IO (see examples below), additionnaly display reboot times
 * Construct email with both PNG and alternate ASCII graphs to be compatible with text only mail clients, or low bandwith mail viewing
 * Automatically scale graphs according to system characteristics (ie. get total memory for memory graph y axis)

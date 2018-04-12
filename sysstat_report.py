@@ -150,18 +150,6 @@ def format_email(exp, dest, subject, header_text, img_format, img_filepaths, alt
   return msg.as_string()
 
 
-def decompress(in_filepath, out_filepath):
-  """ Decompress gzip or bzip2 input file to output file. """
-  logging.getLogger().debug("Decompressing '%s' to '%s'..." % (in_filepath, out_filepath))
-  with contextlib.ExitStack() as cm:
-    if os.path.splitext(in_filepath)[1].lower() == ".gz":
-      in_file = cm.enter_context(gzip.open(in_filepath, "rb"))
-    elif os.path.splitext(in_filepath)[1].lower() == ".bz2":
-      in_file = cm.enter_context(bz2.open(in_filepath, "rb"))
-    out_file = cm.enter_context(open(out_filepath, "wb"))
-    shutil.copyfileobj(in_file, out_file)
-
-
 class SysstatData:
 
   """ Source of system stats. """
@@ -178,34 +166,17 @@ class SysstatData:
     if report_type is ReportType.DAILY:
       date = today - datetime.timedelta(days=1)
       filepath_formats = [filepath_format_dd, filepath_format_yyyymmdd]
-      for filepath_format in filepath_formats:
-        filepath = date.strftime(filepath_format)
-        if os.path.isfile(filepath):
-          break
-      if os.path.isfile(filepath):
+      filepath = __class__.getSysstatDataFilepath(date, filepath_formats, temp_dir)
+      if filepath is not None::
         self.sa_filepaths.append(filepath)
-      else:
-        logging.getLogger().warning("No sysstat data file for date %s" % (date))
 
     elif report_type is ReportType.WEEKLY:
       filepath_formats = [filepath_format_yyyymmdd, filepath_format_subdir, filepath_format_dd]
       for i in range(7, 0, -1):
         date = today - datetime.timedelta(days=i)
-        for filepath_format in filepath_formats:
-          filepath = date.strftime(filepath_format)
-          compressed_filepaths = ("%s.gz" % (filepath), "%s.bz2" % (filepath))
-          if not os.path.isfile(filepath):
-            for compressed_filepath in compressed_filepaths:
-              if os.path.isfile(compressed_filepath):
-                filepath = os.path.join(temp_dir, os.path.basename(filepath))
-                decompress(compressed_filepath, filepath)
-                break
-          if os.path.isfile(filepath):
-            break
-        if os.path.isfile(filepath):
+        filepath = __class__.getSysstatDataFilepath(date, filepath_formats, temp_dir)
+        if filepath is not None::
           self.sa_filepaths.append(filepath)
-        else:
-          logging.getLogger().warning("No sysstat data file for date %s" % (date))
 
     elif report_type is ReportType.MONTHLY:
       filepath_formats = [filepath_format_subdir, filepath_format_yyyymmdd]
@@ -217,21 +188,37 @@ class SysstatData:
         month = today.month - 1
       for day in range(1, calendar.monthrange(year, month)[1] + 1):
         date = datetime.date(year, month, day)
-        for filepath_format in filepath_formats:
-          filepath = date.strftime(filepath_format)
-          compressed_filepaths = ("%s.gz" % (filepath), "%s.bz2" % (filepath))
-          if not os.path.isfile(filepath):
-            for compressed_filepath in compressed_filepaths:
-              if os.path.isfile(compressed_filepath):
-                filepath = os.path.join(temp_dir, os.path.basename(filepath))
-                decompress(compressed_filepath, filepath)
-                break
-          if os.path.isfile(filepath):
-            break
-        if os.path.isfile(filepath):
+        filepath = __class__.getSysstatDataFilepath(date, filepath_formats, temp_dir)
+        if filepath is not None::
           self.sa_filepaths.append(filepath)
-        else:
-          logging.getLogger().warning("No sysstat data file for date %04u/%02u/%02u" % (year, month, day))
+
+  @staticmethod
+  def decompress(in_filepath, out_filepath):
+    """ Decompress gzip or bzip2 input file to output file. """
+    logging.getLogger().debug("Decompressing '%s' to '%s'..." % (in_filepath, out_filepath))
+    with contextlib.ExitStack() as cm:
+      if os.path.splitext(in_filepath)[1].lower() == ".gz":
+        in_file = cm.enter_context(gzip.open(in_filepath, "rb"))
+      elif os.path.splitext(in_filepath)[1].lower() == ".bz2":
+        in_file = cm.enter_context(bz2.open(in_filepath, "rb"))
+      out_file = cm.enter_context(open(out_filepath, "wb"))
+      shutil.copyfileobj(in_file, out_file)
+
+  @staticmethod
+  def getSysstatDataFilepath(date, filepath_formats, temp_dir):
+    """ Get data file path for requested date, by decompressing file in needed, return filepath or None if not found. """
+    for filepath_format in filepath_formats:
+      filepath = date.strftime(filepath_format)
+      compressed_filepaths = ("%s.gz" % (filepath), "%s.bz2" % (filepath))
+      if not os.path.isfile(filepath):
+        for compressed_filepath in compressed_filepaths:
+          if os.path.isfile(compressed_filepath):
+            filepath = os.path.join(temp_dir, os.path.basename(filepath))
+            __class__.decompress(compressed_filepath, filepath)
+            break
+      if os.path.isfile(filepath):
+        return filepath
+    logging.getLogger().warning("No sysstat data file for date %s" % (date))
 
   def hasEnoughData(self):
     """ Return True if enough sysstat data files have been found to plot something, False instead. """
@@ -271,7 +258,7 @@ class SysstatData:
         continue
       out_file.write(line)
 
-  def generateData(self, dtype, output_filepath):
+  def generateDataToPlot(self, dtype, output_filepath):
     """
     Generate data to plot (';' separated values).
 
@@ -575,7 +562,7 @@ if __name__ == "__main__":
       # data
       logging.getLogger().info("Extracting %s data..." % (data_type.name))
       data_filepath = os.path.join(temp_dir, "%s.csv" % (data_type.name.lower()))
-      indexes, data_filepaths = sysstat_data.generateData(data_type, data_filepath)
+      indexes, data_filepaths = sysstat_data.generateDataToPlot(data_type, data_filepath)
       if not data_filepaths:
         data_filepaths = {"": data_filepath}
 

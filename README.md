@@ -11,7 +11,7 @@ This tool attempts to be simple and efficient and allow generating periodic repo
 ## Features
 
 * Allows generating daily/weekly/monthly reports
-* Generates graphs with data from 5min load average, CPU usage, memory usage, swap usage, network IO and drive IO (see examples below), additionnaly display reboot times
+* Generates graphs with data from 5min load average, CPU usage, memory usage, swap usage, network IO, TCP/UDP socket stats (IPv4 & IPv6), TCP (IPv4) socket state transistions, and drive IO (see examples below), additionnaly display reboot times
 * Construct email with both PNG and alternate ASCII graphs to be compatible with text only mail clients, or low bandwith mail viewing
 * Automatically scale graphs according to system characteristics (ie. get total memory for memory graph y axis)
 * Weekly and monthly graphs are automatically smoothed (hides small variations better viewed on daily graphs) to remain readable
@@ -67,7 +67,9 @@ Download it to `/usr/local/bin`, ie with:
 
 For the weekly and monthly reports to be generated properly, you may need to increase the value of `HISTORY` in `/etc/sysstat/sysstat`, to respectively at least 7 and 31.
 
-Stat files compressed with gzip, bzip2 or xz are handled properly.
+Stat files compressed with gzip, bzip2 or xz are supported.
+
+To enable the socket and tcp reports, you need to edit the `SADC_OPTIONS` variable in `/etc/sysstat/sysstat` to add `-S SNMP,IPV6`.
 
 
 ## Usage

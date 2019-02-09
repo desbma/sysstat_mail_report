@@ -28,7 +28,7 @@ import xml.etree.ElementTree
 
 
 ReportType = enum.Enum("ReportType", ("DAILY", "WEEKLY", "MONTHLY"))
-SysstatDataType = enum.Enum("SysstatDataType", ("LOAD", "CPU", "MEM", "SWAP", "NET", "IO"))
+SysstatDataType = enum.Enum("SysstatDataType", ("LOAD", "CPU", "MEM", "SWAP", "NET", "SOCKET", "TCP4", "IO"))
 GraphFormat = enum.Enum("GraphFormat", ("TXT", "PNG", "SVG"))
 
 HAS_OPTIPNG = shutil.which("optipng") is not None
@@ -155,9 +155,29 @@ class SysstatData:
 
   """ Source of system stats. """
 
+  SADF_CMDS = {SysstatDataType.LOAD: (("-q",),),
+               SysstatDataType.CPU: (("-u",),),
+               SysstatDataType.MEM: (("-r",),),
+               SysstatDataType.SWAP: (("-S",),),
+               SysstatDataType.NET: (("-n", "DEV"),),
+               SysstatDataType.SOCKET: (("-n", "SOCK"), ("-n", "SOCK6")),
+               SysstatDataType.TCP4: (("-n", "TCP"), ("-n", "ETCP")),
+               SysstatDataType.IO: (("-b",),)}
+
+  CSV_COLUMNS = {SysstatDataType.LOAD: ("timestamp", "ldavg-5"),
+                 SysstatDataType.CPU: ("timestamp", "%user", "%nice", "%system", "%iowait", "%steal", "%idle"),
+                 SysstatDataType.MEM: ("timestamp", "kbmemused", "kbbuffers", "kbcached", "kbcommit", "kbactive",
+                                       "kbdirty"),
+                 SysstatDataType.SWAP: ("timestamp", "%swpused"),
+                 SysstatDataType.NET: ("timestamp", "rxkB/s", "txkB/s"),
+                 SysstatDataType.SOCKET: ("timestamp", "tcpsck", "udpsck", "tcp6sck", "udp6sck"),
+                 SysstatDataType.TCP4: ("timestamp", "active/s", "passive/s", "atmptf/s"),
+                 SysstatDataType.IO: ("timestamp", "bread/s", "bwrtn/s")}
+
   def __init__(self, report_type, temp_dir):
     assert(report_type in ReportType)
     self.report_type = report_type
+    self.temp_dir = temp_dir
     self.sa_filepaths = []
     today = datetime.date.today()
     filepath_format_dd = "/var/log/sysstat/sa%d"
@@ -232,16 +252,54 @@ class SysstatData:
 
   def generateRawCsv(self, dtype, sa_filepath, output_file):
     """ Extract stats from sa file and write them in CSV format to text file. """
-    cmd = ["sadf", "-d", "-U", "--"]
-    dtype_cmd = {SysstatDataType.LOAD: ("-q",),
-                 SysstatDataType.CPU: ("-u",),
-                 SysstatDataType.MEM: ("-r",),
-                 SysstatDataType.SWAP: ("-S",),
-                 SysstatDataType.NET: ("-n", "DEV"),
-                 SysstatDataType.IO: ("-b",)}
-    cmd.extend(dtype_cmd[dtype])
-    cmd.append(sa_filepath)
-    subprocess.check_call(cmd, stdout=output_file, universal_newlines=True)
+    tmp_csv_files = []
+    with contextlib.ExitStack() as cm:
+      for i, sadf_cmd in enumerate(__class__.SADF_CMDS[dtype]):
+        tmp_csv_file = cm.enter_context(tempfile.TemporaryFile("w+t",
+                                                               prefix="%s_%02u" % (dtype.name.lower(), i),
+                                                               suffix=".csv",
+                                                               dir=self.temp_dir))
+        cmd = ["sadf", "-d", "-U", "--"]
+        cmd.extend(sadf_cmd)
+        cmd.append(sa_filepath)
+        subprocess.check_call(cmd, stdout=tmp_csv_file, universal_newlines=True)
+        tmp_csv_file.seek(0)
+        tmp_csv_files.append(tmp_csv_file)
+      self.mergeCsvFiles(tmp_csv_files, output_file)
+
+  def mergeCsvFiles(self, source_files, dest_file):
+    """ Merge several CSV files into one with same number of lines. """
+    filtered_source_files = []
+    with contextlib.ExitStack() as cm:
+      sources_columns = []
+      for source_file in source_files:
+        # get columns
+        sources_columns.append(self.getCsvColumns(source_file))
+
+        # filter input files
+        filtered_source_file = cm.enter_context(tempfile.TemporaryFile("w+t",
+                                                                       suffix=".csv",
+                                                                       dir=self.temp_dir))
+        self.filterRawCsv(source_file, filtered_source_file)
+        filtered_source_file.seek(0)
+        filtered_source_files.append(filtered_source_file)
+
+      # merge line per line
+      first_line = True
+      for sources_line in zip(*filtered_source_files):
+        added_fields_names = []
+        row = []
+        for source_columns, source_line in zip(sources_columns, sources_line):
+          fields = source_line.rstrip().split(";")
+          for field_name, field in zip(source_columns, fields):
+            if field_name not in added_fields_names:
+              added_fields_names.append(field_name)
+              row.append(field)
+        if first_line:
+          # write column names
+          dest_file.write("# %s\n" % (";".join(added_fields_names)))
+          first_line = False
+        dest_file.write("%s\n" % (";".join(row)))
 
   def getCsvColumns(self, csv_file):
     """ Extract column names from CSV file. """
@@ -270,70 +328,122 @@ class SysstatData:
     """
     assert(dtype in SysstatDataType)
     net_output_filepaths = {}
-    columns = None
 
-    with open(output_filepath, "wt") as output_file:
+    with open(output_filepath, "w+t") as output_file:
       for sa_filepath in self.sa_filepaths:
-        with tempfile.TemporaryFile("w+t",
-                                    prefix="%s_" % (dtype.name.lower()),
-                                    suffix=".csv",
-                                    dir=os.path.dirname(output_filepath)) as tmp_file:
-          self.generateRawCsv(dtype, sa_filepath, tmp_file)
-          if columns is None:
-            tmp_file.seek(0)
-            columns = self.getCsvColumns(tmp_file)
-          # append data and remove invalid lines
-          tmp_file.seek(0)
-          self.filterRawCsv(tmp_file, output_file)
+        self.generateRawCsv(dtype, sa_filepath, output_file)
 
-    if dtype is SysstatDataType.NET:
-      # split file by interface
-      with open(output_filepath, "rt") as output_file:
-        for line in output_file:
-          fields = line.split(";", 5)
-          if int(fields[1]) == -1:  # fields[3] == "LINUX-RESTART"
-            continue
-          itf = fields[3]
-          if itf in net_output_filepaths:
-            # not a new interface
-            break
-          base_filename, ext = os.path.splitext(output_filepath)
-          net_output_filepaths[itf] = "%s_%s%s" % (base_filename, itf, ext)
-      logging.getLogger().debug("Found %u network interfaces: %s" % (len(net_output_filepaths), ", ".join(net_output_filepaths)))
-      with contextlib.ExitStack() as ctx:
-        itf_files = {}
-        for itf, itf_filepath in net_output_filepaths.items():
-          itf_files[itf] = ctx.enter_context(open(itf_filepath, "wt"))
-        with open(output_filepath, "rt") as output_file:
-          for line in output_file:
-            fields = line.split(";", 5)
-            if int(fields[1]) == -1:  # fields[3] == "LINUX-RESTART"
-              continue
-            itf = fields[3]
-            if itf in itf_files:
-              itf_files[itf].write(line)
+      # get columns
+      output_file.seek(0)
+      columns = self.getCsvColumns(output_file)
 
-    dtype_columns = {SysstatDataType.LOAD: ("timestamp", "ldavg-5"),
-                     SysstatDataType.CPU: ("timestamp", "%user", "%nice", "%system", "%iowait", "%steal", "%idle"),
-                     SysstatDataType.MEM: ("timestamp", "kbmemused", "kbbuffers", "kbcached", "kbcommit", "kbactive", "kbdirty"),
-                     SysstatDataType.SWAP: ("timestamp", "%swpused"),
-                     SysstatDataType.NET: ("timestamp", "rxkB/s", "txkB/s"),
-                     SysstatDataType.IO: ("timestamp", "bread/s", "bwrtn/s")}
-    indexes = __class__.getColumnIndexes(dtype_columns[dtype], columns)
+      if dtype is SysstatDataType.NET:
+        # find interfaces
+        interfaces = __class__.getInterfacesFromCsv(output_file)
+        logging.getLogger().debug("Found %u network interfaces: %s" % (len(interfaces), ", ".join(interfaces)))
+        base_filename, ext = os.path.splitext(output_filepath)
+        for interface in interfaces:
+          net_output_filepaths[interface] = "%s_%s%s" % (base_filename, interface, ext)
+
+        # split file by interface
+        output_file.seek(0)
+        __class__.splitCsvFile(output_file, 3, net_output_filepaths)
+
+    indexes = __class__.getColumnIndexes(__class__.CSV_COLUMNS[dtype], columns)
 
     return indexes, net_output_filepaths
 
   @staticmethod
   def getColumnIndexes(needed_column_names, column_names):
+    """ Return column indexes matching the given column names, to be used by Gnuplot. """
     indexes = []
     for needed_column_name in needed_column_names:
       indexes.append(column_names.index(needed_column_name) + 1)  # gnuplot indexes start at 1
     return tuple(indexes)
 
+  @staticmethod
+  def splitCsvFile(input_file, column_index, output_files):
+    """ Split input file according to a given column index, and output filepaths dict. """
+    with contextlib.ExitStack() as ctx:
+      files = {}
+      for k, filepath in output_files.items():
+        files[k] = ctx.enter_context(open(filepath, "wt"))
+      for line in input_file:
+        if line.startswith("#"):
+          continue
+        fields = line.split(";")
+        k = fields[column_index]
+        files[k].write(line)
+
+  @staticmethod
+  def getInterfacesFromCsv(net_file):
+    """ Extract interface names from a CSV file with network data. """
+    interfaces = set()
+    for line in net_file:
+      if line.startswith("#"):
+        continue
+      fields = line.split(";", 5)
+      interface = fields[3]
+      if interface in interfaces:
+        # not a new interface
+        break
+      interfaces.add(interface)
+    return interfaces
+
 
 class Plotter:
 
   """ Class to plot with GNU Plot. """
+
+  PLOT_ARGS = {SysstatDataType.LOAD: {"title": "Load",
+                                      "data_titles": ("ldavg-5",),
+                                      "ylabel": "5min load average",
+                                      "yrange": (0, "%u<*" % (os.cpu_count()))},
+               SysstatDataType.CPU: {"title": "CPU",
+                                     "data_titles": ("user",
+                                                     "nice",
+                                                     "system",
+                                                     "iowait",
+                                                     "steal",
+                                                     "idle"),
+                                     "ylabel": "CPU usage (%)",
+                                     "yrange": (0, 100)},
+               SysstatDataType.MEM: {"title": "Memory",
+                                     "data_titles": ("used",
+                                                     "buffers",
+                                                     "cached",
+                                                     "commit",
+                                                     "active",
+                                                     "dirty"),
+                                     "ylabel": "Memory used (MB)",
+                                     "yrange": (0, get_total_memory_mb())},
+               SysstatDataType.SWAP: {"title": "Swap",
+                                      "data_titles": ("swpused",),
+                                      "ylabel": "Swap usage (%)",
+                                      "yrange": (0, 100)},
+               SysstatDataType.NET: {"title": "Network",
+                                     "data_titles": ("rx",
+                                                     "tx"),
+                                     "ylabel": "Bandwith (Mb/s)",
+                                     "yrange": (0, "%u<*" % (get_max_network_speed()))},
+               SysstatDataType.SOCKET: {"title": "Sockets",
+                                        "data_titles": ("tcp4",
+                                                        "udp4",
+                                                        "tcp6",
+                                                        "udp6"),
+                                        "ylabel": "Socket count",
+                                        "yrange": (0, None)},
+               SysstatDataType.TCP4: {"title": "TCP/IPv4 sockets",
+                                      "data_titles": ("active",
+                                                      "passive",
+                                                      "atmptf"),
+                                      "ylabel": "Transitions (socket/s)",
+                                      "yrange": (0, None)},
+               SysstatDataType.IO: {"title": "IO",
+                                    "data_titles": ("read",
+                                                    "wrtn"),
+                                    "ylabel": "Activity (MB/s)",
+                                    "yrange": (0, None)}}
 
   def __init__(self, report_type):
     assert(report_type in ReportType)
@@ -472,7 +582,8 @@ if __name__ == "__main__":
   arg_parser.add_argument("-d",
                           "--graph-data",
                           choices=tuple(t.name.lower() for t in SysstatDataType),
-                          default=tuple(t.name.lower() for t in SysstatDataType),
+                          default=tuple(t.name.lower() for t in SysstatDataType if t not in (SysstatDataType.SOCKET,
+                                                                                             SysstatDataType.TCP4)),
                           nargs="+",
                           dest="data_type",
                           help="Data to graph")
@@ -519,46 +630,8 @@ if __name__ == "__main__":
       exit(1)
 
     plotter = Plotter(report_type)
-    plot_args = {SysstatDataType.LOAD: {"title": "Load",
-                                        "data_titles": ("ldavg-5",),
-                                        "ylabel": "5min load average",
-                                        "yrange": (0, "%u<*" % (os.cpu_count()))},
-                 SysstatDataType.CPU: {"title": "CPU",
-                                       "data_titles": ("user",
-                                                       "nice",
-                                                       "system",
-                                                       "iowait",
-                                                       "steal",
-                                                       "idle"),
-                                       "ylabel": "CPU usage (%)",
-                                       "yrange": (0, 100)},
-                 SysstatDataType.MEM: {"title": "Memory",
-                                       "data_titles": ("used",
-                                                       "buffers",
-                                                       "cached",
-                                                       "commit",
-                                                       "active",
-                                                       "dirty"),
-                                       "ylabel": "Memory used (MB)",
-                                       "yrange": (0, get_total_memory_mb())},
-                 SysstatDataType.SWAP: {"title": "Swap",
-                                        "data_titles": ("swpused",),
-                                        "ylabel": "Swap usage (%)",
-                                        "yrange": (0, 100)},
-                 SysstatDataType.NET: {"title": "Network",
-                                       "data_titles": ("rx",
-                                                       "tx"),
-                                       "ylabel": "Bandwith (Mb/s)",
-                                       "yrange": (0, "%u<*" % (get_max_network_speed()))},
-                 SysstatDataType.IO: {"title": "IO",
-                                      "data_titles": ("read",
-                                                      "wrtn"),
-                                      "ylabel": "Activity (MB/s)",
-                                      "yrange": (0, None)}}
-
     graph_filepaths = {GraphFormat.TXT: [],
                        args.img_format: []}
-
     reboot_times = get_reboot_times()
 
     for data_type in args.data_type:
@@ -583,7 +656,7 @@ if __name__ == "__main__":
                      reboot_times,
                      graph_filepaths[graph_format][-1],
                      report_type is not ReportType.DAILY,
-                     **plot_args[data_type])
+                     **Plotter.PLOT_ARGS[data_type])
 
     # send mail
     logging.getLogger().info("Formatting email...")

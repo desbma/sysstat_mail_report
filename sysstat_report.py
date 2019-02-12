@@ -165,9 +165,8 @@ class SysstatData:
                SysstatDataType.IO: (("-b",),)}
 
   CSV_COLUMNS = {SysstatDataType.LOAD: ("timestamp", "ldavg-5"),
-                 SysstatDataType.CPU: ("timestamp", "%user", "%nice", "%system", "%iowait", "%steal", "%idle"),
-                 SysstatDataType.MEM: ("timestamp", "kbmemused", "kbbuffers", "kbcached", "kbcommit", "kbactive",
-                                       "kbdirty"),
+                 SysstatDataType.CPU: ("timestamp", "%user", "%nice", "%system", "%iowait", "%steal"),
+                 SysstatDataType.MEM: ("timestamp", "kbmemused", "kbbuffers", "kbcached", "kbdirty"),
                  SysstatDataType.SWAP: ("timestamp", "%swpused"),
                  SysstatDataType.NET: ("timestamp", "rxkB/s", "txkB/s"),
                  SysstatDataType.SOCKET: ("timestamp", "tcpsck", "udpsck", "tcp6sck", "udp6sck"),
@@ -404,16 +403,13 @@ class Plotter:
                                                      "nice",
                                                      "system",
                                                      "iowait",
-                                                     "steal",
-                                                     "idle"),
+                                                     "steal"),
                                      "ylabel": "CPU usage (%)",
                                      "yrange": (0, 100)},
                SysstatDataType.MEM: {"title": "Memory",
-                                     "data_titles": ("used",
+                                     "data_titles": ("other",
                                                      "buffers",
                                                      "cached",
-                                                     "commit",
-                                                     "active",
                                                      "dirty"),
                                      "ylabel": "Memory used (MB)",
                                      "yrange": (0, get_total_memory_mb())},
@@ -518,17 +514,28 @@ class Plotter:
     for reboot_time in reboot_times:
       reboot_time = reboot_time + datetime.timedelta(seconds=time.localtime().tm_gmtoff)
       if date_from <= reboot_time <= date_to:
-        gnuplot_code.append("set arrow from \"%s\",graph 0 to \"%s\",graph 1 lt 0 nohead" % (reboot_time.strftime("%s"),
-                                                                                             reboot_time.strftime("%s")))
+        gnuplot_code.append("set arrow from \"%s\",graph 0 to \"%s\",graph 1 lt 0 nohead front" % (reboot_time.strftime("%s"),
+                                                                                                   reboot_time.strftime("%s")))
 
     # plot
     assert(len(data_indexes) - 1 == len(data_titles))
     plot_cmds = []
+    stacked = data_type in (SysstatDataType.CPU, SysstatDataType.MEM)
     for data_file_nickname, data_filepath in data_filepaths.items():
+      prev_ydata = None
       for data_index, data_title in zip(data_indexes[1:], data_titles):
         if data_type is SysstatDataType.MEM:
+          ydata = "$%u" % (data_index)
+          if data_title == "other":
+            # substract other memory columns except free
+            data_indexes_to_sub = []
+            for data_index_to_sub, data_title_to_sub in zip(data_indexes[1:], data_titles):
+              if data_title_to_sub in ("other", "free"):
+                continue
+              data_indexes_to_sub.append(data_index_to_sub)
+            ydata = "(%s-%s)" % (ydata, "-".join("$%u" % (i) for i in data_indexes_to_sub))
           # convert from KB to MB
-          ydata = "($%u/1000)" % (data_index)
+          ydata = "(%s/1000)" % (ydata)
         elif data_type is SysstatDataType.NET:
           # convert from KB/s to Mb/s
           ydata = "($%u/125)" % (data_index)
@@ -536,20 +543,32 @@ class Plotter:
           # convert from block/s to MB/s
           ydata = "($%u*512/1000000)" % (data_index)
         else:
-          ydata = str(data_index)
+          ydata = "($%u)" % (data_index)
         if data_file_nickname:
           data_title = "%s_%s" % (data_file_nickname, data_title)
-        plot_cmds.append("'%s' using ($%u+%u):%s %swith lines title '%s'" % (data_filepath,
-                                                                             data_indexes[0],
-                                                                             time.localtime().tm_gmtoff,
-                                                                             ydata,
-                                                                             "smooth bezier " if smooth else "",
-                                                                             data_title))
+        if stacked:
+          plot_type = "filledcurve x1"
+          if prev_ydata is not None:
+            # values are cumulative
+            ydata = "(%s+%s)" % (ydata, prev_ydata)
+        else:
+          plot_type = "line"
+        plot_cmds.append("'%s' using ($%u+%u):%s %swith %s title '%s'" % (data_filepath,
+                                                                          data_indexes[0],
+                                                                          time.localtime().tm_gmtoff,
+                                                                          ydata,
+                                                                          "smooth bezier " if smooth else "",
+                                                                          plot_type,
+                                                                          data_title))
+        prev_ydata = ydata
+    if stacked:
+      plot_cmds.reverse()
     gnuplot_code.append("plot %s" % (", ".join(plot_cmds)))
 
     # run gnuplot
     gnuplot_code[-1] += ";"
     gnuplot_code = ";\n".join(gnuplot_code)
+    logging.getLogger().debug(gnuplot_code)
     subprocess.check_output(("gnuplot",),
                             input=gnuplot_code,
                             stderr=None if logging.getLogger().isEnabledFor(logging.DEBUG) else subprocess.DEVNULL,

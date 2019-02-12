@@ -13,10 +13,11 @@ This tool attempts to be simple and efficient and allow generating periodic repo
 * Allows generating daily/weekly/monthly reports
 * Generates graphs with data from 5min load average, CPU usage, memory usage, swap usage, network IO, TCP/UDP socket stats (IPv4 & IPv6), TCP (IPv4) socket state transistions, and drive IO (see examples below), additionnaly display reboot times
 * Construct email with both PNG and alternate ASCII graphs to be compatible with text only mail clients, or low bandwith mail viewing
-* Automatically scale graphs according to system characteristics (ie. get total memory for memory graph y axis)
+* Automatically scale graphs according to system characteristics (eg. get total memory for memory graph y axis)
 * Weekly and monthly graphs are automatically smoothed (hides small variations better viewed on daily graphs) to remain readable
 * Properly handle special cases like DST time shifts, months with less than 30 days, etc
 * Few dependencies: sysstat, gnuplot, sendmail and Python 3.4 (no Python package dependencies): install is as simple as copying a file on most servers. No server or daemon is required or installed.
+* Graph generation is usually very fast, even with large data files, because all the data processing is done by Gnuplot
 * Automatically crunch images to save a few KB per email without any loss of quality
 * Optionally support SVG images for crisp looking graphs <sup>1</sup>
 
@@ -28,10 +29,10 @@ This tool attempts to be simple and efficient and allow generating periodic repo
 Click images to see full size.
 
 Daily CPU graph:  
-[![Daily CPU graph](https://i.imgur.com/qyTeBFsm.png)](https://i.imgur.com/qyTeBFs.png)
+[![Daily CPU graph](https://i.imgur.com/tPb7ZOpm.png)](https://i.imgur.com/tPb7ZOp.png)
 
 Daily memory graph:  
-[![Daily memory graph](https://i.imgur.com/W3uvwtMm.png)](https://i.imgur.com/W3uvwtM.png)
+[![Daily memory graph](https://i.imgur.com/NsJS6FFm.png)](https://i.imgur.com/NsJS6FF.png)
 
 Daily network graph:  
 [![Daily network graph](https://i.imgur.com/yZ8zKEMm.png)](https://i.imgur.com/yZ8zKEM.png)

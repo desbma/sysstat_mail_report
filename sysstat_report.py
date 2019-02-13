@@ -514,8 +514,10 @@ class Plotter:
     for reboot_time in reboot_times:
       reboot_time = reboot_time + datetime.timedelta(seconds=time.localtime().tm_gmtoff)
       if date_from <= reboot_time <= date_to:
-        gnuplot_code.append("set arrow from \"%s\",graph 0 to \"%s\",graph 1 lt 0 nohead front" % (reboot_time.strftime("%s"),
-                                                                                                   reboot_time.strftime("%s")))
+        reboot_ts = reboot_time.strftime("%s")
+        gnuplot_code.append("set arrow from \"%s\",graph 0 to \"%s\",graph 1 lt 0 nohead front" % (reboot_ts,
+                                                                                                   reboot_ts))
+        gnuplot_code.append("set label \"reboot\" at \"%s\",graph 0 right rotate by 45 font 'Liberation,7'" % (reboot_ts))
 
     # plot
     assert(len(data_indexes) - 1 == len(data_titles))

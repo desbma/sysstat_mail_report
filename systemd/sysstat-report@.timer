@@ -1,0 +1,9 @@
+[Unit]
+Description=Send %i Sysstat email reports
+
+[Timer]
+OnCalendar=%i
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

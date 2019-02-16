@@ -75,12 +75,21 @@ To enable the socket and tcp reports, you need to edit the `SADC_OPTIONS` variab
 
 ## Usage
 
-The recommanded way of calling the script is through a cron job, so for example for a daily report, create the file `/etc/cron.daily/sysstat-report`, make it executable, and add the lines:
+### Cron
+
+The simplest way of calling the script is through a cron job, so for example for a daily report, create the file `/etc/cron.daily/sysstat-report`, make it executable, and add the lines:
 
     #!/bin/sh
     exec sysstat_report.py daily 'Sysstat <email.from@example.com>' 'email.to@example.com'
 
 When the script is called every day, you will receive an email with the graphs for the previous day.
+
+### Systemd
+
+To control `systat_report` with Systemd, unit files are provided, you can install them by running `./install-systemd.sh`.
+Follow given instructions to configure and enable periodic reports.
+
+### Command line options
 
 Run `sysstat_report.py -h` to get full command line reference.
 

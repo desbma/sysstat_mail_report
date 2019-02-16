@@ -1,0 +1,17 @@
+[Unit]
+Description=Send %i Sysstat email reports
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/conf.d/sysstat-report
+ExecStart=/usr/local/bin/sysstat_report.py %i "${EMAIL_FROM}" "${EMAIL_TO}" -v "${LOG_LEVEL}" -f "${GRAPH_FORMAT}" -d $GRAPHS
+
+# hardening
+DynamicUser=true
+ReadOnlyPaths=/
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

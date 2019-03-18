@@ -456,10 +456,10 @@ class Plotter:
       gnuplot_code.extend(("set terminal dumb 110,25",
                            "set output '%s'" % (output_filepath)))
     elif format is GraphFormat.PNG:
-      gnuplot_code.extend(("set terminal png transparent size %u,%u font 'Liberation,9'" % tuple(img_size),
+      gnuplot_code.extend(("set terminal png transparent size %u,%u font 'Liberation,9' noenhanced" % tuple(img_size),
                            "set output '%s'" % (output_filepath)))
     elif format is GraphFormat.SVG:
-      gnuplot_code.extend(("set terminal svg size %u,%u font 'Liberation,9'" % tuple(img_size),
+      gnuplot_code.extend(("set terminal svg size %u,%u font 'Liberation,9' noenhanced" % tuple(img_size),
                            "set output '%s'" % (output_filepath)))
 
     # input data setup

@@ -29,10 +29,10 @@ This tool attempts to be simple and efficient and allow generating periodic repo
 Click images to see full size.
 
 Daily CPU graph:  
-[![Daily CPU graph](https://i.imgur.com/Pkh6VHum.png)](https://i.imgur.com/Pkh6VHu.png)
+[![Daily CPU graph](https://i.imgur.com/o0Qzd8nm.png)](https://i.imgur.com/o0Qzd8n.png)
 
 Daily memory graph:  
-[![Daily memory graph](https://i.imgur.com/o0Qzd8nm.png)](https://i.imgur.com/o0Qzd8n.png)
+[![Daily memory graph](https://i.imgur.com/Pkh6VHum.png)](https://i.imgur.com/Pkh6VHu.png)
 
 Daily network graph:  
 [![Daily network graph](https://i.imgur.com/yZ8zKEMm.png)](https://i.imgur.com/yZ8zKEM.png)

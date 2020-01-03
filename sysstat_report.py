@@ -487,7 +487,7 @@ class Plotter:
     gnuplot_code.append("set title '%s'" % (title))
 
     # caption
-    gnuplot_code.append("set key outside right samplen 3 spacing 1.75")
+    gnuplot_code.append("set key outside right samplen 3 spacing 1.75 width 2")
 
     # x axis setup
     gnuplot_code.extend(("set xdata time",

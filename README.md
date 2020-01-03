@@ -50,11 +50,12 @@ Weekly network graph:
 * [Gnuplot >= 4.6](http://www.gnuplot.info/)
 * sendmail (configured and operational to send emails)
 * [optipng](http://optipng.sourceforge.net/) (optional)
+* [scour](https://github.com/scour-project/scour) (optional)
 
 And of course [sysstat](http://sebastien.godard.pagesperso-orange.fr/).
 
 On Ubuntu and other Debian derivatives, you can install all of them with:  
-`sudo apt-get install sysstat python3 gnuplot-nox sendmail-bin optipng`
+`sudo apt-get install sysstat python3 gnuplot-nox sendmail-bin optipng scour`
 
 
 ## Installation

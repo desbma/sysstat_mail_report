@@ -84,18 +84,33 @@ def get_reboot_times():
 
 def minify_svg(svg_filepath):
   """ Open a SVG file, and return its minified content as a string. """
-  xml.etree.ElementTree.register_namespace("", "http://www.w3.org/2000/svg")
-  tree = xml.etree.ElementTree.parse(svg_filepath)
-  root = tree.getroot()
-  ns = root.tag.rsplit("}", 1)[0][1:]
-  # remove title tags
-  for e in root.findall(".//{%s}title/.." % (ns)):
-    for se in e.findall("{%s}title" % (ns)):
-      e.remove(se)
-  with io.StringIO() as tmp:
-    tree.write(tmp, encoding="unicode", xml_declaration=False)
-    tmp.seek(0)
-    data = "".join(map(str.strip, tmp.readlines()))
+  logger = logging.getLogger()
+  size_before = os.path.getsize(svg_filepath)
+
+  if shutil.which("scour"):
+    method = "scour"
+    cmd = ("scour", "-q",
+           "--enable-id-stripping",
+           "--enable-comment-stripping",
+           "--shorten-ids",
+           "--no-line-breaks",
+           "--remove-descriptive-elements",
+           svg_filepath)
+    data = subprocess.check_output(cmd,
+                                   stdin=subprocess.DEVNULL,
+                                   universal_newlines=True)
+
+  else:
+    method = "identity"
+    with open(svg_filepath, "rt") as f:
+      data = f.read()
+
+  size_after = len(data.encode())
+  if method != "identity":
+    logger.debug("%s SVG minification: %d B (%.2f%%)" % (method.capitalize(),
+                                                         size_after - size_before,
+                                                         100 * (size_after - size_before) / size_before))
+
   return data
 
 

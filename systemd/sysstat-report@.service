@@ -10,6 +10,7 @@ ExecStart=/usr/local/bin/sysstat_report.py %i "${EMAIL_FROM}" "${EMAIL_TO}" -v "
 
 # hardening
 DynamicUser=true
+Group=mail
 ReadOnlyPaths=/
 ProtectHome=true
 

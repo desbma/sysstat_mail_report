@@ -21,7 +21,7 @@ This tool attempts to be simple and efficient and allow generating periodic repo
 * Automatically crunch images to save a few KB per email without any loss of quality
 * Optionally support SVG images for crisp looking graphs <sup>1</sup>
 
-<sup>1. SVG rendering has been tested successfully in Thunderbird and Geary email clients, but is not supported by GMail (as of 2015/09/07), and probably many other older clients. In case of doubt, use the default PNG + text fallback mode.</sup> 
+<sup>1. SVG rendering is currently not supported [by many mail clients](https://www.caniemail.com/features/html-svg/). In case of doubt, use the default PNG + text fallback mode.</sup> 
 
 
 ## Graph examples

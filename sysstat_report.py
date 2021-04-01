@@ -199,19 +199,19 @@ class SysstatData:
         self.temp_dir = temp_dir
         self.sa_filepaths = []
         today = datetime.date.today()
-        filepath_format_dd = "/var/log/sysstat/sa%d"
-        filepath_format_subdir = "/var/log/sysstat/%Y%m/sa%d"
-        filepath_format_yyyymmdd = "/var/log/sysstat/sa%Y%m%d"
+        filepath_formats = [
+            os.path.join("/var/log", subdir, leaf_path)
+            for subdir in ("sysstat", "sa")
+            for leaf_path in (r"sa%d", r"%Y%m/sa%d", r"sa%Y%m%d")
+        ]
 
         if report_type is ReportType.DAILY:
             date = today - datetime.timedelta(days=1)
-            filepath_formats = [filepath_format_dd, filepath_format_yyyymmdd]
             filepath = __class__.getSysstatDataFilepath(date, filepath_formats, temp_dir)
             if filepath is not None:
                 self.sa_filepaths.append(filepath)
 
         elif report_type is ReportType.WEEKLY:
-            filepath_formats = [filepath_format_yyyymmdd, filepath_format_subdir, filepath_format_dd]
             for i in range(7, 0, -1):
                 date = today - datetime.timedelta(days=i)
                 filepath = __class__.getSysstatDataFilepath(date, filepath_formats, temp_dir)
@@ -219,7 +219,6 @@ class SysstatData:
                     self.sa_filepaths.append(filepath)
 
         elif report_type is ReportType.MONTHLY:
-            filepath_formats = [filepath_format_subdir, filepath_format_yyyymmdd]
             if today.month == 1:
                 year = today.year - 1
                 month = 12

@@ -14,7 +14,6 @@ import email.utils
 import enum
 import gzip
 import inspect
-import io
 import itertools
 import logging
 import lzma
@@ -24,7 +23,6 @@ import shutil
 import subprocess
 import tempfile
 import time
-import xml.etree.ElementTree
 
 ReportType = enum.Enum("ReportType", ("DAILY", "WEEKLY", "MONTHLY"))
 SysstatDataType = enum.Enum("SysstatDataType", ("LOAD", "CPU", "MEM", "SWAP", "NET", "SOCKET", "TCP4", "IO"))
@@ -236,11 +234,12 @@ class SysstatData:
         """ Decompress gzip, bzip2, or lzma input file to output file. """
         logging.getLogger().debug("Decompressing '%s' to '%s'..." % (in_filepath, out_filepath))
         with contextlib.ExitStack() as cm:
-            if os.path.splitext(in_filepath)[1].lower() == ".gz":
+            ext = os.path.splitext(in_filepath)[-1].lower()
+            if ext == ".gz":
                 in_file = cm.enter_context(gzip.open(in_filepath, "rb"))
-            elif os.path.splitext(in_filepath)[1].lower() == ".bz2":
+            elif ext == ".bz2":
                 in_file = cm.enter_context(bz2.open(in_filepath, "rb"))
-            elif os.path.splitext(in_filepath)[1].lower() == ".xz":
+            elif ext == ".xz":
                 in_file = cm.enter_context(lzma.open(in_filepath, "rb"))
             out_file = cm.enter_context(open(out_filepath, "wb"))
             shutil.copyfileobj(in_file, out_file)

@@ -70,9 +70,9 @@ def get_reboot_times():
             cmd = ("last", "-R", "reboot", "-f", log_filepath)
             output = subprocess.check_output(cmd, universal_newlines=True)
             output = output.splitlines()[0:-2]
-            date_regex = re.compile(".*boot\s*([\w\s]*:\d{2}).*$")
-            for l in output:
-                date_str = date_regex.match(l).group(1).strip()
+            date_regex = re.compile(r".*boot\s*([\w\s]*:\d{2}).*$")
+            for line in output:
+                date_str = date_regex.match(line).group(1).strip()
                 # TODO remove fixed year
                 date = datetime.datetime.strptime(date_str + " %u" % (datetime.date.today().year), "%a %b %d %H:%M %Y")
                 reboot_times.append(date)
@@ -246,7 +246,7 @@ class SysstatData:
 
     @staticmethod
     def getSysstatDataFilepath(date, filepath_formats, temp_dir):
-        """ Get data file path for requested date, by decompressing file in needed, return filepath or None if not found. """
+        """ Get data file path for requested date, decompress file in needed, return filepath or None if not found. """
         for filepath_format in filepath_formats:
             filepath = date.strftime(filepath_format)
             if not os.path.isfile(filepath):
@@ -339,8 +339,8 @@ class SysstatData:
         """
         Generate data to plot (';' separated values).
 
-        Return indexes of columns to use in output, and a dictionary of name -> filepath output datafiles if the provided
-        output file had to be split.
+        Return indexes of columns to use in output, and a dictionary of name -> filepath output datafiles if the
+        provided output file had to be split.
         """
         assert dtype in SysstatDataType
         net_output_filepaths = {}
@@ -691,7 +691,7 @@ if __name__ == "__main__":
     # do the job
     report_type = ReportType[args.report_type.upper()]
     with tempfile.TemporaryDirectory(
-        prefix="%s_" % (os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe())))[0])
+        prefix="%s_" % (os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe())))[0])  # type: ignore
     ) as temp_dir:
         sysstat_data = SysstatData(report_type, temp_dir)
         if not sysstat_data.hasEnoughData():

@@ -18,6 +18,7 @@ import itertools
 import logging
 import lzma
 import os
+import operator
 import re
 import shutil
 import subprocess
@@ -395,14 +396,9 @@ class SysstatData:
     def getInterfacesFromCsv(net_file):
         """ Extract interface names from a CSV file with network data. """
         interfaces = set()
-        for line in net_file:
-            if line.startswith("#"):
-                continue
+        for line in itertools.filterfalse(operator.methodcaller("startswith", "#"), net_file):
             fields = line.split(";", 5)
             interface = fields[3]
-            if interface in interfaces:
-                # not a new interface
-                break
             interfaces.add(interface)
         return interfaces
 

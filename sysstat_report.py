@@ -68,14 +68,13 @@ def get_reboot_times():
     for i in range(1, -1, -1):
         log_filepath = "/var/log/wtmp%s" % (".%u" % (i) if i != 0 else "")
         if os.path.isfile(log_filepath):
-            cmd = ("last", "-R", "reboot", "-f", log_filepath)
+            cmd = ("last", "-F", "-R", "reboot", "-f", log_filepath)
             output = subprocess.check_output(cmd, universal_newlines=True)
             output = output.splitlines()[0:-2]
-            date_regex = re.compile(r".*boot\s*([\w\s]*:\d{2}).*$")
+            date_regex = re.compile(r".*boot\s*([\w\s]+\d{2}:\d{2}:\d{2} \d{4}).*$")
             for line in output:
                 date_str = date_regex.match(line).group(1).strip()
-                # TODO remove fixed year
-                date = datetime.datetime.strptime(date_str + " %u" % (datetime.date.today().year), "%a %b %d %H:%M %Y")
+                date = datetime.datetime.strptime(date_str, "%a %b %d %H:%M:%S %Y")
                 reboot_times.append(date)
     return reboot_times
 

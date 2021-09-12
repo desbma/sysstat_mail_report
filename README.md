@@ -1,5 +1,4 @@
-Sysstat Mail Report
-===================
+# Sysstat Mail Report
 
 Send daily/weekly/monthly email reports with graphs plotted from sysstat monitoring data.
 
@@ -7,22 +6,20 @@ There are a lot of tools available to plot sysstat data and generate graphs, but
 
 This tool attempts to be simple and efficient and allow generating periodic reports (from cron) to be emailed directly.
 
-
 ## Features
 
-* Allows generating daily/weekly/monthly reports
-* Generates graphs with data from 5min load average, CPU usage, memory usage, swap usage, network IO, TCP/UDP socket stats (IPv4 & IPv6), TCP (IPv4) socket state transistions, and drive IO (see examples below), additionnaly display reboot times
-* Construct email with both PNG and alternate ASCII graphs to be compatible with text only mail clients, or low bandwith mail viewing
-* Automatically scale graphs according to system characteristics (eg. get total memory for memory graph y axis)
-* Weekly and monthly graphs are automatically smoothed (hides small variations better viewed on daily graphs) to remain readable
-* Properly handle special cases like DST time shifts, months with less than 30 days, etc
-* Few dependencies: sysstat, gnuplot, sendmail and Python 3.4 (no Python package dependencies): install is as simple as copying a file on most servers. No server or daemon is required or installed.
-* Graph generation is usually very fast, even with large data files, because all the data processing is done by Gnuplot
-* Automatically crunch images to save a few KB per email without any loss of quality
-* Optionally support SVG images for crisp looking graphs <sup>1</sup>
+- Allows generating daily/weekly/monthly reports
+- Generates graphs with data from 5min load average, CPU usage, memory usage, swap usage, network IO, TCP/UDP socket stats (IPv4 & IPv6), TCP (IPv4) socket state transistions, and drive IO (see examples below), additionnaly display reboot times
+- Construct email with both PNG and alternate ASCII graphs to be compatible with text only mail clients, or low bandwith mail viewing
+- Automatically scale graphs according to system characteristics (eg. get total memory for memory graph y axis)
+- Weekly and monthly graphs are automatically smoothed (hides small variations better viewed on daily graphs) to remain readable
+- Properly handle special cases like DST time shifts, months with less than 30 days, etc
+- Few dependencies: sysstat, gnuplot, sendmail and Python 3.6 (no Python package dependencies): install is as simple as copying a file on most servers. No server or daemon is required or installed.
+- Graph generation is usually very fast, even with large data files, because all the data processing is done by Gnuplot
+- Automatically crunch images to save a few KB per email without any loss of quality
+- Optionally support SVG images for crisp looking graphs <sup>1</sup>
 
-<sup>1. SVG rendering is currently not supported [by many mail clients](https://www.caniemail.com/features/html-svg/). In case of doubt, use the default PNG + text fallback mode.</sup> 
-
+<sup>1. SVG rendering is currently not supported [by many mail clients](https://www.caniemail.com/features/html-svg/). In case of doubt, use the default PNG + text fallback mode.</sup>
 
 ## Graph examples
 
@@ -43,27 +40,24 @@ Daily IO graph:
 Weekly network graph:  
 [![Weekly network graph](https://i.imgur.com/pYRv26Em.png)](https://i.imgur.com/pYRv26E.png)
 
-
 ## Dependencies
 
-* [Python >= 3.4](https://www.python.org/downloads/)
-* [Gnuplot >= 4.6](http://www.gnuplot.info/)
-* sendmail (configured and operational to send emails)
-* [optipng](http://optipng.sourceforge.net/) (optional)
-* [scour](https://github.com/scour-project/scour) (optional)
+- [Python >= 3.6](https://www.python.org/downloads/)
+- [Gnuplot >= 4.6](http://www.gnuplot.info/)
+- sendmail (configured and operational to send emails)
+- [optipng](http://optipng.sourceforge.net/) (optional)
+- [scour](https://github.com/scour-project/scour) (optional)
 
 And of course [sysstat](http://sebastien.godard.pagesperso-orange.fr/).
 
 On Ubuntu and other Debian derivatives, you can install all of them with:  
 `sudo apt-get install sysstat python3 gnuplot-nox sendmail-bin optipng scour`
 
-
 ## Installation
 
 Download it to `/usr/local/bin`, ie with:
 
     curl https://raw.githubusercontent.com/desbma/sysstat_mail_report/master/sysstat_report.py > /usr/local/bin/sysstat_report.py && chmod +x /usr/local/bin/sysstat_report.py
-
 
 ### Sysstat configuration
 
@@ -72,7 +66,6 @@ For the weekly and monthly reports to be generated properly, you may need to inc
 Stat files compressed with gzip, bzip2 or xz are supported.
 
 To enable the socket and tcp reports, you need to edit the `SADC_OPTIONS` variable in `/etc/sysstat/sysstat` to add `-S SNMP,IPV6`.
-
 
 ## Usage
 
@@ -93,7 +86,6 @@ Follow given instructions to configure and enable periodic reports.
 ### Command line options
 
 Run `sysstat_report.py -h` to get full command line reference.
-
 
 ## License
 

@@ -34,7 +34,9 @@ except AttributeError:
     cmd_to_string = subprocess.list2cmdline
 
 ReportType = enum.Enum("ReportType", ("DAILY", "WEEKLY", "MONTHLY"))
-SysstatDataType = enum.Enum("SysstatDataType", ("LOAD", "CPU", "MEM", "SWAP", "NET", "SOCKET", "TCP4", "IO"))
+SysstatDataType = enum.Enum(
+    "SysstatDataType", ("LOAD", "CPU", "MEM", "SWAP", "NET", "SOCKET", "TCP4", "IO", "FS_USAGE")
+)
 GraphFormat = enum.Enum("GraphFormat", ("TXT", "PNG", "SVG"))
 
 HAS_OPTIPNG = shutil.which("optipng") is not None
@@ -200,6 +202,7 @@ class SysstatData:
         SysstatDataType.SOCKET: (("-n", "SOCK"), ("-n", "SOCK6")),
         SysstatDataType.TCP4: (("-n", "TCP"), ("-n", "ETCP")),
         SysstatDataType.IO: (("-b",),),
+        SysstatDataType.FS_USAGE: (("-F", "MOUNT"),),
     }
 
     CSV_COLUMNS = {
@@ -211,6 +214,7 @@ class SysstatData:
         SysstatDataType.SOCKET: ("timestamp", "tcpsck", "udpsck", "tcp6sck", "udp6sck"),
         SysstatDataType.TCP4: ("timestamp", "active/s", "passive/s", "atmptf/s"),
         SysstatDataType.IO: ("timestamp", "bread/s", "bwrtn/s"),
+        SysstatDataType.FS_USAGE: ("timestamp", "%fsused"),
     }
 
     def __init__(self, report_type: ReportType, temp_dir: str):
@@ -269,7 +273,7 @@ class SysstatData:
             shutil.copyfileobj(in_file, out_file)
 
     @classmethod
-    def getSysstatDataFilepath(cls, date, filepath_formats: Sequence[str], temp_dir: str) -> None:
+    def getSysstatDataFilepath(cls, date, filepath_formats: Sequence[str], temp_dir: str) -> Optional[str]:
         """Get data file path for requested date, decompress file in needed, return filepath or None if not found."""
         for filepath_format in filepath_formats:
             filepath = date.strftime(filepath_format)
@@ -283,6 +287,7 @@ class SysstatData:
             else:
                 return filepath
         logging.getLogger().warning(f"No sysstat data file for date {date}")
+        return None
 
     def hasEnoughData(self) -> bool:
         """Return True if enough sysstat data files have been found to plot something, False instead."""
@@ -368,7 +373,7 @@ class SysstatData:
         provided output file had to be split.
         """
         assert dtype in SysstatDataType
-        net_output_filepaths = {}
+        output_filepaths = {}
 
         with open(output_filepath, "w+t") as output_file:
             for sa_filepath in self.sa_filepaths:
@@ -378,21 +383,23 @@ class SysstatData:
             output_file.seek(0)
             columns = self.getCsvColumns(output_file)
 
-            if dtype is SysstatDataType.NET:
-                # find interfaces
-                interfaces = self.getInterfacesFromCsv(output_file)
-                logging.getLogger().debug(f"Found {len(interfaces)} network interfaces: {', '.join(interfaces)}")
+            if dtype in (SysstatDataType.NET, SysstatDataType.FS_USAGE):
+                # find data field in csv file. if dtype is NET it gets network interfaces, if it is DISK mount points
+                data_field = self.getDataFieldFromCsv(output_file)
+                data_field_type = "network interfaces" if dtype is SysstatDataType.NET else "filesystems"
+                logging.getLogger().debug(f"Found {len(data_field)} {data_field_type}: {', '.join(data_field)}")
                 base_filename, ext = os.path.splitext(output_filepath)
-                for interface in interfaces:
-                    net_output_filepaths[interface] = f"{base_filename}_{interface}{ext}"
+                for df in data_field:
+                    data_field_path = "".join(x for x in df if x.isalnum())
+                    output_filepaths[df] = f"{base_filename}_{data_field_path}{ext}"
 
                 # split file by interface
                 output_file.seek(0)
-                self.splitCsvFile(output_file, 3, net_output_filepaths)
+                self.splitCsvFile(output_file, 3, output_filepaths)
 
         indexes = self.getColumnIndexes(self.CSV_COLUMNS[dtype], columns)
 
-        return indexes, net_output_filepaths
+        return indexes, output_filepaths
 
     @staticmethod
     def getColumnIndexes(needed_column_names: Sequence[str], column_names: Sequence[str]) -> Sequence[int]:
@@ -417,7 +424,7 @@ class SysstatData:
                 files[k].write(line)
 
     @staticmethod
-    def getInterfacesFromCsv(net_file: IO[str]) -> Set[str]:
+    def getDataFieldFromCsv(net_file: IO[str]) -> Set[str]:
         """Extract interface names from a CSV file with network data."""
         interfaces = set()
         for line in itertools.filterfalse(operator.methodcaller("startswith", "#"), net_file):
@@ -479,6 +486,12 @@ class Plotter:
             "data_titles": ("read", "wrtn"),
             "ylabel": "Activity (MB/s)",
             "yrange": (0, None),
+        },
+        SysstatDataType.FS_USAGE: {
+            "title": "Filesystem usage",
+            "data_titles": ("%",),
+            "ylabel": "Usage (%)",
+            "yrange": (0, 100),
         },
     }
 
@@ -667,7 +680,14 @@ if __name__ == "__main__":
         default=tuple(
             t.name.lower()
             for t in SysstatDataType
-            if t not in (SysstatDataType.LOAD, SysstatDataType.SWAP, SysstatDataType.SOCKET, SysstatDataType.TCP4)
+            if t
+            not in (
+                SysstatDataType.LOAD,
+                SysstatDataType.SWAP,
+                SysstatDataType.SOCKET,
+                SysstatDataType.TCP4,
+                SysstatDataType.FS_USAGE,
+            )
         ),
         nargs="+",
         dest="data_type",

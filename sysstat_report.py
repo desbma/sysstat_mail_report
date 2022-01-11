@@ -384,10 +384,14 @@ class SysstatData:
             columns = self.getCsvColumns(output_file)
 
             if dtype in (SysstatDataType.NET, SysstatDataType.FS_USAGE):
-                # find data field in csv file. if dtype is NET it gets network interfaces, if it is DISK mount points
-                data_field = self.getDataFieldFromCsv(output_file)
-                data_field_type = "network interfaces" if dtype is SysstatDataType.NET else "filesystems"
-                logging.getLogger().debug(f"Found {len(data_field)} {data_field_type}: {', '.join(data_field)}")
+                # find varying data field in csv file
+                data_field_info = {
+                    SysstatDataType.NET: ("network interfaces", 3),
+                    SysstatDataType.FS_USAGE: ("filesystems", 3),
+                }
+                data_field_name, data_field_index = data_field_info[dtype]
+                data_field = self.getUniqueFieldValuesFromCsv(output_file, data_field_index)
+                logging.getLogger().debug(f"Found {len(data_field)} {data_field_name}: {', '.join(data_field)}")
                 base_filename, ext = os.path.splitext(output_filepath)
                 for df in data_field:
                     data_field_path = "".join(x for x in df if x.isalnum())
@@ -424,14 +428,14 @@ class SysstatData:
                 files[k].write(line)
 
     @staticmethod
-    def getDataFieldFromCsv(net_file: IO[str]) -> Set[str]:
-        """Extract interface names from a CSV file with network data."""
-        interfaces = set()
-        for line in itertools.filterfalse(operator.methodcaller("startswith", "#"), net_file):
-            fields = line.split(";", 5)
-            interface = fields[3]
-            interfaces.add(interface)
-        return interfaces
+    def getUniqueFieldValuesFromCsv(in_file: IO[str], index: int) -> Set[str]:
+        """Extract unique field values from a CSV file."""
+        values = set()
+        for line in itertools.filterfalse(operator.methodcaller("startswith", "#"), in_file):
+            fields = line.split(";", index + 2)
+            value = fields[index]
+            values.add(value)
+        return values
 
 
 class Plotter:

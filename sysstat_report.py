@@ -20,11 +20,18 @@ import lzma
 import operator
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
 import time
-from typing import IO, Any, Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import IO, Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
+
+try:
+    # Python >= 3.8
+    cmd_to_string: Callable[[Sequence[str]], str] = shlex.join
+except AttributeError:
+    cmd_to_string = subprocess.list2cmdline
 
 ReportType = enum.Enum("ReportType", ("DAILY", "WEEKLY", "MONTHLY"))
 SysstatDataType = enum.Enum("SysstatDataType", ("LOAD", "CPU", "MEM", "SWAP", "NET", "SOCKET", "TCP4", "IO"))
@@ -71,6 +78,7 @@ def get_reboot_times() -> List[datetime.datetime]:
         log_filepath = "/var/log/wtmp%s" % (".%u" % (i) if i != 0 else "")
         if os.path.isfile(log_filepath):
             cmd = ("last", "-F", "-R", "reboot", "-f", log_filepath)
+            logging.getLogger().debug(cmd_to_string(cmd))
             output_str = subprocess.run(
                 cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, universal_newlines=True, check=True
             ).stdout
@@ -101,6 +109,7 @@ def minify_svg(svg_filepath: str) -> str:
             "--remove-descriptive-elements",
             svg_filepath,
         )
+        logging.getLogger().debug(cmd_to_string(cmd))
         data = subprocess.run(cmd, stdin=subprocess.DEVNULL, universal_newlines=True, check=True).stdout
 
     else:
@@ -295,6 +304,7 @@ class SysstatData:
                 cmd = ["sadf", "-d", "-U", "--"]
                 cmd.extend(sadf_cmd)
                 cmd.append(sa_filepath)
+                logging.getLogger().debug(cmd_to_string(cmd))
                 subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=tmp_csv_file, universal_newlines=True, check=True)
                 tmp_csv_file.seek(0)
                 tmp_csv_files.append(tmp_csv_file)
@@ -632,7 +642,9 @@ class Plotter:
         # output post processing
         if format is GraphFormat.PNG and HAS_OPTIPNG:
             logging.getLogger().debug(f"Crunching {output_filepath!r}...")
-            subprocess.run(("optipng", "-quiet", "-o", "1", output_filepath), check=True)
+            cmd = ("optipng", "-quiet", "-o", "1", output_filepath)
+            logging.getLogger().debug(cmd_to_string(cmd))
+            subprocess.run(cmd, check=True)
         if format is GraphFormat.TXT:
             # remove first 2 bytes as they cause problems with emails
             with open(output_filepath, "rt") as output_file:
@@ -747,6 +759,6 @@ if __name__ == "__main__":
         real_mail_from = email.utils.parseaddr(args.mail_from)[1]
         real_mail_to = email.utils.parseaddr(args.mail_to)[1]
         logging.getLogger().info(f"Sending email from {real_mail_from!r} to {real_mail_to!r}...")
-        subprocess.run(
-            ("sendmail", "-f", real_mail_from, real_mail_to), input=email_data, universal_newlines=True, check=True
-        )
+        cmd = ("sendmail", "-f", real_mail_from, real_mail_to)
+        logging.getLogger().debug(cmd_to_string(cmd))
+        subprocess.run(cmd, input=email_data, universal_newlines=True, check=True)

@@ -390,10 +390,11 @@ class SysstatData:
                     SysstatDataType.FS_USAGE: ("filesystems", 3),
                 }
                 data_field_name, data_field_index = data_field_info[dtype]
-                data_field = self.getUniqueFieldValuesFromCsv(output_file, data_field_index)
-                logging.getLogger().debug(f"Found {len(data_field)} {data_field_name}: {', '.join(data_field)}")
+                data_fields = list(self.getUniqueFieldValuesFromCsv(output_file, data_field_index))
+                data_fields.sort()
+                logging.getLogger().debug(f"Found {len(data_fields)} {data_field_name}: {', '.join(data_fields)}")
                 base_filename, ext = os.path.splitext(output_filepath)
-                for df in data_field:
+                for df in data_fields:
                     data_field_path = "".join(x for x in df if x.isalnum())
                     output_filepaths[df] = f"{base_filename}_{data_field_path}{ext}"
 

@@ -493,7 +493,7 @@ class Plotter:
         },
         SysstatDataType.FS_USAGE: {
             "title": "Filesystem usage",
-            "data_titles": ("%",),
+            "data_titles": ("",),
             "ylabel": "Usage (%)",
             "yrange": (0, 100),
         },
@@ -627,7 +627,10 @@ class Plotter:
                 else:
                     ydata = f"(${data_index})"
                 if data_file_nickname:
-                    data_title = f"{data_file_nickname}_{data_title}"
+                    if not data_title:
+                        data_title = data_file_nickname
+                    else:
+                        data_title = f"{data_file_nickname}_{data_title}"
                 if stacked:
                     plot_type = "filledcurve x1"
                     if prev_ydata is not None:

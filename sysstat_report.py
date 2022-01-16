@@ -394,11 +394,10 @@ class SysstatData:
                 data_fields.sort()
                 logging.getLogger().debug(f"Found {len(data_fields)} {data_field_name}: {', '.join(data_fields)}")
                 base_filename, ext = os.path.splitext(output_filepath)
-                for df in data_fields:
-                    data_field_path = "".join(x for x in df if x.isalnum())
-                    output_filepaths[df] = f"{base_filename}_{data_field_path}{ext}"
+                for i, df in enumerate(data_fields, 1):
+                    output_filepaths[df] = f"{base_filename}_{i}{ext}"
 
-                # split file by interface
+                # split file by varying field
                 output_file.seek(0)
                 self.splitCsvFile(output_file, 3, output_filepaths)
 

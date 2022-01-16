@@ -9,15 +9,24 @@ This tool attempts to be simple and efficient and allow generating periodic repo
 ## Features
 
 - Allows generating daily/weekly/monthly reports
-- Generates graphs with data from 5min load average, CPU usage, memory usage, swap usage, network IO, TCP/UDP socket stats (IPv4 & IPv6), TCP (IPv4) socket state transistions, drive IO and filesystem usage (see examples below), additionnaly display reboot times
-- Construct email with both PNG and alternate ASCII graphs to be compatible with text only mail clients, or low bandwidth mail viewing
+- Generates graphs (see examples below) with optional data from:
+  - 5min load average
+  - CPU usage
+  - memory usage
+  - swap usage
+  - network IO
+  - TCP/UDP socket stats (IPv4 & IPv6) + TCP (IPv4) socket state transistions
+  - drive IO
+  - filesystem usage
+- (re)boot times are shown on each graph
 - Automatically scale graphs according to system characteristics (eg. get total memory for memory graph y axis)
 - Weekly and monthly graphs are automatically smoothed (hides small variations better viewed on daily graphs) to remain readable
 - Properly handle special cases like DST time shifts, months with less than 30 days, etc
-- Few dependencies: sysstat, gnuplot, sendmail and Python 3.6 (no Python package dependencies): install is as simple as copying a file on most servers. No server or daemon is required or installed.
-- Graph generation is usually very fast, even with large data files, because all the data processing is done by Gnuplot
+- Construct email with both PNG and alternate ASCII graphs to be compatible with text only mail clients, or low bandwidth mail viewing
 - Automatically crunch images to save a few KB per email without any loss of quality
 - Optionally support SVG images for crisp looking graphs <sup>1</sup>
+- Few dependencies: sysstat, gnuplot, sendmail and Python 3.6 (no Python package dependencies): installing is as simple as copying a file on most servers. No server or daemon is required or installed.
+- Execution is usually very fast, even with large data files, because all the data processing is done by Gnuplot
 
 <sup>1. SVG rendering is currently not supported [by many mail clients](https://www.caniemail.com/features/html-svg/). In case of doubt, use the default PNG + text fallback mode.</sup>
 
@@ -44,7 +53,7 @@ Weekly network graph:
 
 - [Python >= 3.6](https://www.python.org/downloads/)
 - [Gnuplot >= 4.6](http://www.gnuplot.info/)
-- sendmail (configured and operational to send emails)
+- sendmail (configured and ready to send emails)
 - [optipng](http://optipng.sourceforge.net/) (optional)
 - [scour](https://github.com/scour-project/scour) (optional)
 

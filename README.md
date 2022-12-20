@@ -54,8 +54,7 @@ Weekly network graph:
 - [Python >= 3.6](https://www.python.org/downloads/)
 - [Gnuplot >= 4.6](http://www.gnuplot.info/)
 - sendmail (configured and ready to send emails)
-- [optipng](http://optipng.sourceforge.net/) (optional)
-- [oxipng](https://github.com/shssoichiro/oxipng) (optional)
+- [oxipng](https://github.com/shssoichiro/oxipng) or [optipng](http://optipng.sourceforge.net/) (optional)
 - [scour](https://github.com/scour-project/scour) (optional)
 
 And of course [sysstat](http://sebastien.godard.pagesperso-orange.fr/).

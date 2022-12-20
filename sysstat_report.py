@@ -40,6 +40,7 @@ SysstatDataType = enum.Enum(
 GraphFormat = enum.Enum("GraphFormat", ("TXT", "PNG", "SVG"))
 
 HAS_OPTIPNG = shutil.which("optipng") is not None
+HAS_OXIPNG = shutil.which("oxipng") is not None
 
 
 def get_total_memory_mb() -> int:
@@ -660,9 +661,12 @@ class Plotter:
         )
 
         # output post processing
-        if format is GraphFormat.PNG and HAS_OPTIPNG:
+        if format is GraphFormat.PNG and (HAS_OPTIPNG or HAS_OXIPNG):
             logging.getLogger().debug(f"Crunching {output_filepath!r}...")
-            cmd = ("optipng", "-quiet", "-o", "1", output_filepath)
+            if HAS_OXIPNG:
+                cmd = ("oxipng", "-q", "-s", output_filepath)
+            else:
+                cmd = ("optipng", "-quiet", "-o", "1", output_filepath)
             logging.getLogger().debug(cmd_to_string(cmd))
             subprocess.run(cmd, check=True)
         if format is GraphFormat.TXT:

@@ -664,7 +664,7 @@ class Plotter:
         if format is GraphFormat.PNG and (HAS_OPTIPNG or HAS_OXIPNG):
             logging.getLogger().debug(f"Crunching {output_filepath!r}...")
             if HAS_OXIPNG:
-                cmd = ("oxipng", "-q", "-s", output_filepath)
+                cmd: Sequence[str] = ("oxipng", "-q", "-s", output_filepath)
             else:
                 cmd = ("optipng", "-quiet", "-o", "1", output_filepath)
             logging.getLogger().debug(cmd_to_string(cmd))

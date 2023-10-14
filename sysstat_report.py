@@ -731,9 +731,9 @@ if __name__ == "__main__":
     logging_level = {"warning": logging.WARNING, "normal": logging.INFO, "debug": logging.DEBUG}
     logging.basicConfig(level=logging_level[args.verbosity], format=r"%(asctime)s %(levelname)s %(message)s")
 
-    # display warning if optipng is missing
-    if (args.img_format is GraphFormat.PNG) and (not HAS_OPTIPNG):
-        logging.getLogger().warning("optipng could not be found, PNG crunching will be disabled")
+    # display warning if optipng/oxipng are missing
+    if (args.img_format is GraphFormat.PNG) and (not HAS_OPTIPNG) and (not HAS_OXIPNG):
+        logging.getLogger().warning("optipng/oxipng could not be found, PNG crunching will be disabled")
 
     # do the job
     report_type = ReportType[args.report_type.upper()]

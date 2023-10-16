@@ -64,11 +64,17 @@ On Ubuntu and other Debian derivatives, you can install all of them with:
 
 ## Installation
 
+### Arch Linux
+
+Arch Linux users can install the [sysstat-mail-report-git](https://aur.archlinux.org/packages/sysstat-mail-report-git/) AUR package.
+
+### Manual
+
 Download it to `/usr/local/bin`, ie with:
 
     curl https://raw.githubusercontent.com/desbma/sysstat_mail_report/master/sysstat_report.py > /usr/local/bin/sysstat_report.py && chmod +x /usr/local/bin/sysstat_report.py
 
-### Sysstat configuration
+## Sysstat configuration
 
 For the weekly and monthly reports to be generated properly, you may need to increase the value of `HISTORY` in `/etc/sysstat/sysstat`, to respectively at least 7 and 31.
 

@@ -8,7 +8,7 @@ Type=oneshot
 EnvironmentFile=/etc/conf.d/sysstat-report
 ExecStart=/usr/local/bin/sysstat_report.py %i "${EMAIL_FROM}" "${EMAIL_TO}" -v "${LOG_LEVEL}" -f "${GRAPH_FORMAT}" -d $GRAPHS
 
-# hardening
+# hardening, comment out if you encouter permission errors when sending mail
 DynamicUser=true
 Group=mail
 ReadOnlyPaths=/

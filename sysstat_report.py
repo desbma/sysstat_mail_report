@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-""" Generate and send a sysstat mail report. """
+"""Generate and send a sysstat mail report."""
 
 import argparse
 import bz2
@@ -35,7 +35,8 @@ except AttributeError:
 
 ReportType = enum.Enum("ReportType", ("DAILY", "WEEKLY", "MONTHLY"))
 SysstatDataType = enum.Enum(
-    "SysstatDataType", ("LOAD", "CPU", "MEM", "SWAP", "NET", "SOCKET", "TCP4", "IO", "FS_USAGE")
+    "SysstatDataType",
+    ("LOAD", "CPU", "MEM", "SWAP", "NET", "SOCKET", "TCP4", "IO", "FS_USAGE"),
 )
 GraphFormat = enum.Enum("GraphFormat", ("TXT", "PNG", "SVG"))
 
@@ -46,8 +47,12 @@ HAS_OXIPNG = shutil.which("oxipng") is not None
 def get_total_memory_mb() -> int:
     """Return total amount of system RAM in MB."""
     with open("/proc/meminfo", "rt") as f:
-        total_line = next(itertools.dropwhile(lambda x: not x.startswith("MemTotal:"), f))
-    total_mem = int(tuple(filter(None, map(str.strip, total_line.split(" "))))[1]) // 1024
+        total_line = next(
+            itertools.dropwhile(lambda x: not x.startswith("MemTotal:"), f)
+        )
+    total_mem = (
+        int(tuple(filter(None, map(str.strip, total_line.split(" "))))[1]) // 1024
+    )
     logging.getLogger().info(f"Total amount of memory: {total_mem} MB")
     return total_mem
 
@@ -83,7 +88,11 @@ def get_reboot_times() -> List[datetime.datetime]:
             cmd = ("last", "-F", "-R", "reboot", "-f", log_filepath)
             logging.getLogger().debug(cmd_to_string(cmd))
             output_str = subprocess.run(
-                cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, universal_newlines=True, check=True
+                cmd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                universal_newlines=True,
+                check=True,
             ).stdout
             output_lines = output_str.splitlines()[0:-2]
             for line in output_lines:
@@ -113,7 +122,9 @@ def minify_svg(svg_filepath: str) -> str:
             svg_filepath,
         )
         logging.getLogger().debug(cmd_to_string(cmd))
-        data = subprocess.run(cmd, stdin=subprocess.DEVNULL, universal_newlines=True, check=True).stdout
+        data = subprocess.run(
+            cmd, stdin=subprocess.DEVNULL, universal_newlines=True, check=True
+        ).stdout
 
     else:
         method = "identity"
@@ -152,7 +163,9 @@ def format_email(
     if header_text is not None:
         html_lines.append(f"<pre>{header_text}</pre><br>")
     if img_format is GraphFormat.PNG:
-        html_lines.append("<br>".join(f'<img src="cid:img{i}">' for i in range(len(img_filepaths))))
+        html_lines.append(
+            "<br>".join(f'<img src="cid:img{i}">' for i in range(len(img_filepaths)))
+        )
     elif img_format is GraphFormat.SVG:
         for img_filepath in img_filepaths:
             if img_filepath is not img_filepath[0]:
@@ -191,7 +204,6 @@ def format_email(
 
 
 class SysstatData:
-
     """Source of system stats."""
 
     SADF_CMDS: Dict[SysstatDataType, Tuple[Tuple[str, ...], ...]] = {
@@ -208,8 +220,21 @@ class SysstatData:
 
     CSV_COLUMNS = {
         SysstatDataType.LOAD: ("timestamp", "ldavg-5"),
-        SysstatDataType.CPU: ("timestamp", r"%user", "%nice", r"%system", r"%iowait", r"%steal"),
-        SysstatDataType.MEM: ("timestamp", "kbmemused", "kbbuffers", "kbcached", "kbdirty"),
+        SysstatDataType.CPU: (
+            "timestamp",
+            r"%user",
+            "%nice",
+            r"%system",
+            r"%iowait",
+            r"%steal",
+        ),
+        SysstatDataType.MEM: (
+            "timestamp",
+            "kbmemused",
+            "kbbuffers",
+            "kbcached",
+            "kbdirty",
+        ),
         SysstatDataType.SWAP: ("timestamp", r"%swpused"),
         SysstatDataType.NET: ("timestamp", "rxkB/s", "txkB/s"),
         SysstatDataType.SOCKET: ("timestamp", "tcpsck", "udpsck", "tcp6sck", "udp6sck"),
@@ -259,12 +284,14 @@ class SysstatData:
     @staticmethod
     def decompress(in_filepath: str, out_filepath: str) -> None:
         """Decompress gzip, bzip2, or lzma input file to output file."""
-        logging.getLogger().debug(f"Decompressing {in_filepath!r} to {out_filepath!r}...")
+        logging.getLogger().debug(
+            f"Decompressing {in_filepath!r} to {out_filepath!r}..."
+        )
         with contextlib.ExitStack() as cm:
             ext = os.path.splitext(in_filepath)[-1].lower()
             if ext == ".gz":
-                in_file: Union[gzip.GzipFile, bz2.BZ2File, lzma.LZMAFile] = cm.enter_context(
-                    gzip.open(in_filepath, "rb")
+                in_file: Union[gzip.GzipFile, bz2.BZ2File, lzma.LZMAFile] = (
+                    cm.enter_context(gzip.open(in_filepath, "rb"))
                 )
             elif ext == ".bz2":
                 in_file = cm.enter_context(bz2.open(in_filepath, "rb"))
@@ -274,12 +301,16 @@ class SysstatData:
             shutil.copyfileobj(in_file, out_file)
 
     @classmethod
-    def getSysstatDataFilepath(cls, date, filepath_formats: Sequence[str], temp_dir: str) -> Optional[str]:
+    def getSysstatDataFilepath(
+        cls, date, filepath_formats: Sequence[str], temp_dir: str
+    ) -> Optional[str]:
         """Get data file path for requested date, decompress file in needed, return filepath or None if not found."""
         for filepath_format in filepath_formats:
             filepath = date.strftime(filepath_format)
             if not os.path.isfile(filepath):
-                compressed_filepaths = (f"{filepath}.{ext}" for ext in ("gz", "bz2", "xz"))
+                compressed_filepaths = (
+                    f"{filepath}.{ext}" for ext in ("gz", "bz2", "xz")
+                )
                 for compressed_filepath in compressed_filepaths:
                     if os.path.isfile(compressed_filepath):
                         filepath = os.path.join(temp_dir, os.path.basename(filepath))
@@ -297,26 +328,39 @@ class SysstatData:
         else:
             return len(self.sa_filepaths) >= 2
 
-    def generateRawCsv(self, dtype: SysstatDataType, sa_filepath: str, output_file: IO[str]) -> None:
+    def generateRawCsv(
+        self, dtype: SysstatDataType, sa_filepath: str, output_file: IO[str]
+    ) -> None:
         """Extract stats from sa file and write them in CSV format to text file."""
         tmp_csv_files = []
         with contextlib.ExitStack() as cm:
             for i, sadf_cmd in enumerate(self.SADF_CMDS[dtype]):
                 tmp_csv_file = cm.enter_context(
                     tempfile.TemporaryFile(
-                        "w+t", prefix=f"{dtype.name.lower()}_{i:02}", suffix=".csv", dir=self.temp_dir
+                        "w+t",
+                        prefix=f"{dtype.name.lower()}_{i:02}",
+                        suffix=".csv",
+                        dir=self.temp_dir,
                     )
                 )
                 cmd = ["sadf", "-d", "-U", "--"]
                 cmd.extend(sadf_cmd)
                 cmd.append(sa_filepath)
                 logging.getLogger().debug(cmd_to_string(cmd))
-                subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=tmp_csv_file, universal_newlines=True, check=True)
+                subprocess.run(
+                    cmd,
+                    stdin=subprocess.DEVNULL,
+                    stdout=tmp_csv_file,
+                    universal_newlines=True,
+                    check=True,
+                )
                 tmp_csv_file.seek(0)
                 tmp_csv_files.append(tmp_csv_file)
             self.mergeCsvFiles(tmp_csv_files, output_file)
 
-    def mergeCsvFiles(self, source_files: Sequence[IO[str]], dest_file: IO[str]) -> None:
+    def mergeCsvFiles(
+        self, source_files: Sequence[IO[str]], dest_file: IO[str]
+    ) -> None:
         """Merge several CSV files into one with same number of lines."""
         filtered_source_files = []
         with contextlib.ExitStack() as cm:
@@ -326,7 +370,9 @@ class SysstatData:
                 sources_columns.append(self.getCsvColumns(source_file))
 
                 # filter input files
-                filtered_source_file = cm.enter_context(tempfile.TemporaryFile("w+t", suffix=".csv", dir=self.temp_dir))
+                filtered_source_file = cm.enter_context(
+                    tempfile.TemporaryFile("w+t", suffix=".csv", dir=self.temp_dir)
+                )
                 self.filterRawCsv(source_file, filtered_source_file)
                 filtered_source_file.seek(0)
                 filtered_source_files.append(filtered_source_file)
@@ -366,7 +412,9 @@ class SysstatData:
                 continue
             out_file.write(line)
 
-    def generateDataToPlot(self, dtype: SysstatDataType, output_filepath: str) -> Tuple[Sequence[int], Dict[str, str]]:
+    def generateDataToPlot(
+        self, dtype: SysstatDataType, output_filepath: str
+    ) -> Tuple[Sequence[int], Dict[str, str]]:
         """
         Generate data to plot (';' separated values).
 
@@ -391,9 +439,13 @@ class SysstatData:
                     SysstatDataType.FS_USAGE: ("filesystems", 3),
                 }
                 data_field_name, data_field_index = data_field_info[dtype]
-                data_fields = list(self.getUniqueFieldValuesFromCsv(output_file, data_field_index))
+                data_fields = list(
+                    self.getUniqueFieldValuesFromCsv(output_file, data_field_index)
+                )
                 data_fields.sort()
-                logging.getLogger().debug(f"Found {len(data_fields)} {data_field_name}: {', '.join(data_fields)}")
+                logging.getLogger().debug(
+                    f"Found {len(data_fields)} {data_field_name}: {', '.join(data_fields)}"
+                )
                 base_filename, ext = os.path.splitext(output_filepath)
                 for i, df in enumerate(data_fields, 1):
                     output_filepaths[df] = f"{base_filename}_{i}{ext}"
@@ -407,15 +459,21 @@ class SysstatData:
         return indexes, output_filepaths
 
     @staticmethod
-    def getColumnIndexes(needed_column_names: Sequence[str], column_names: Sequence[str]) -> Sequence[int]:
+    def getColumnIndexes(
+        needed_column_names: Sequence[str], column_names: Sequence[str]
+    ) -> Sequence[int]:
         """Return column indexes matching the given column names, to be used by Gnuplot."""
         indexes = []
         for needed_column_name in needed_column_names:
-            indexes.append(column_names.index(needed_column_name) + 1)  # gnuplot indexes start at 1
+            indexes.append(
+                column_names.index(needed_column_name) + 1
+            )  # gnuplot indexes start at 1
         return tuple(indexes)
 
     @staticmethod
-    def splitCsvFile(input_file: IO[str], column_index: int, output_files: Dict[str, str]) -> None:
+    def splitCsvFile(
+        input_file: IO[str], column_index: int, output_files: Dict[str, str]
+    ) -> None:
         """Split input file according to a given column index, and output filepaths dict."""
         with contextlib.ExitStack() as ctx:
             files = {}
@@ -432,7 +490,9 @@ class SysstatData:
     def getUniqueFieldValuesFromCsv(in_file: IO[str], index: int) -> Set[str]:
         """Extract unique field values from a CSV file."""
         values = set()
-        for line in itertools.filterfalse(operator.methodcaller("startswith", "#"), in_file):
+        for line in itertools.filterfalse(
+            operator.methodcaller("startswith", "#"), in_file
+        ):
             fields = line.split(";", index + 2)
             value = fields[index]
             values.add(value)
@@ -440,7 +500,6 @@ class SysstatData:
 
 
 class Plotter:
-
     """Class to plot with GNU Plot."""
 
     PLOT_ARGS: Dict[SysstatDataType, Dict[str, Any]] = {
@@ -526,7 +585,9 @@ class Plotter:
 
         # output setup
         if format is GraphFormat.TXT:
-            gnuplot_code_lines.extend(("set terminal dumb 110,25", f"set output '{output_filepath}'"))
+            gnuplot_code_lines.extend(
+                ("set terminal dumb 110,25", f"set output '{output_filepath}'")
+            )
         elif format is GraphFormat.PNG:
             gnuplot_code_lines.extend(
                 (
@@ -551,7 +612,9 @@ class Plotter:
         gnuplot_code_lines.append(f"set title '{title}'")
 
         # caption
-        gnuplot_code_lines.append("set key outside right samplen 3 spacing 1.75 width 2")
+        gnuplot_code_lines.append(
+            "set key outside right samplen 3 spacing 1.75 width 2"
+        )
 
         # x axis setup
         gnuplot_code_lines.extend(("set xdata time", "set xlabel 'Time'"))
@@ -575,11 +638,16 @@ class Plotter:
                 year = today.year
                 month = today.month - 1
             date_from = datetime.datetime(year, month, 1)
-            date_to = datetime.datetime(year, month, calendar.monthrange(year, month)[1])
+            date_to = datetime.datetime(
+                year, month, calendar.monthrange(year, month)[1]
+            )
             format_x = r"%d"
         date_from = date_from + datetime.timedelta(seconds=time.localtime().tm_gmtoff)
         date_to = date_to + datetime.timedelta(seconds=time.localtime().tm_gmtoff)
-        gnuplot_code_lines.append('set xrange["%s":"%s"]' % (date_from.strftime(r"%s"), date_to.strftime(r"%s")))
+        gnuplot_code_lines.append(
+            'set xrange["%s":"%s"]'
+            % (date_from.strftime(r"%s"), date_to.strftime(r"%s"))
+        )
         gnuplot_code_lines.append(f"set format x '{format_x}'")
 
         # y axis setup
@@ -590,7 +658,9 @@ class Plotter:
 
         # reboot lines
         for reboot_time in reboot_times:
-            reboot_time = reboot_time + datetime.timedelta(seconds=time.localtime().tm_gmtoff)
+            reboot_time = reboot_time + datetime.timedelta(
+                seconds=time.localtime().tm_gmtoff
+            )
             if date_from <= reboot_time <= date_to:
                 reboot_ts = reboot_time.strftime(r"%s")
                 gnuplot_code_lines.append(
@@ -612,11 +682,16 @@ class Plotter:
                     if data_title == "other":
                         # substract other memory columns except free
                         data_indexes_to_sub = []
-                        for data_index_to_sub, data_title_to_sub in zip(data_indexes[1:], data_titles):
+                        for data_index_to_sub, data_title_to_sub in zip(
+                            data_indexes[1:], data_titles
+                        ):
                             if data_title_to_sub in ("other", "free"):
                                 continue
                             data_indexes_to_sub.append(data_index_to_sub)
-                        ydata = "(%s-%s)" % (ydata, "-".join(f"${i}" for i in data_indexes_to_sub))
+                        ydata = "(%s-%s)" % (
+                            ydata,
+                            "-".join(f"${i}" for i in data_indexes_to_sub),
+                        )
                     # convert from KB to MB
                     ydata = f"({ydata}/1000)"
                 elif data_type is SysstatDataType.NET:
@@ -655,7 +730,9 @@ class Plotter:
         subprocess.run(
             ("gnuplot",),
             input=gnuplot_code,
-            stderr=None if logging.getLogger().isEnabledFor(logging.DEBUG) else subprocess.DEVNULL,
+            stderr=None
+            if logging.getLogger().isEnabledFor(logging.DEBUG)
+            else subprocess.DEVNULL,
             universal_newlines=True,
             check=True,
         )
@@ -680,8 +757,14 @@ class Plotter:
 
 if __name__ == "__main__":
     # parse args
-    arg_parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    arg_parser.add_argument("report_type", choices=tuple(t.name.lower() for t in ReportType), help="Type of report")
+    arg_parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    arg_parser.add_argument(
+        "report_type",
+        choices=tuple(t.name.lower() for t in ReportType),
+        help="Type of report",
+    )
     arg_parser.add_argument("mail_from", help="Mail sender")
     arg_parser.add_argument("mail_to", help="Mail destination")
     arg_parser.add_argument(
@@ -705,7 +788,13 @@ if __name__ == "__main__":
         help="Data to graph",
     )
     arg_parser.add_argument(
-        "-s", "--img-size", type=int, nargs=2, default=(780, 400), dest="img_size", help="Graph image size"
+        "-s",
+        "--img-size",
+        type=int,
+        nargs=2,
+        default=(780, 400),
+        dest="img_size",
+        help="Graph image size",
     )
     arg_parser.add_argument(
         "-f",
@@ -728,12 +817,21 @@ if __name__ == "__main__":
     args.img_format = GraphFormat[args.img_format.upper()]
 
     # setup logger
-    logging_level = {"warning": logging.WARNING, "normal": logging.INFO, "debug": logging.DEBUG}
-    logging.basicConfig(level=logging_level[args.verbosity], format=r"%(asctime)s %(levelname)s %(message)s")
+    logging_level = {
+        "warning": logging.WARNING,
+        "normal": logging.INFO,
+        "debug": logging.DEBUG,
+    }
+    logging.basicConfig(
+        level=logging_level[args.verbosity],
+        format=r"%(asctime)s %(levelname)s %(message)s",
+    )
 
     # display warning if optipng/oxipng are missing
     if (args.img_format is GraphFormat.PNG) and (not HAS_OPTIPNG) and (not HAS_OXIPNG):
-        logging.getLogger().warning("optipng/oxipng could not be found, PNG crunching will be disabled")
+        logging.getLogger().warning(
+            "optipng/oxipng could not be found, PNG crunching will be disabled"
+        )
 
     # do the job
     report_type = ReportType[args.report_type.upper()]
@@ -746,22 +844,32 @@ if __name__ == "__main__":
             exit(1)
 
         plotter = Plotter(report_type)
-        graph_filepaths: Dict[GraphFormat, List[str]] = {GraphFormat.TXT: [], args.img_format: []}
+        graph_filepaths: Dict[GraphFormat, List[str]] = {
+            GraphFormat.TXT: [],
+            args.img_format: [],
+        }
         reboot_times = get_reboot_times()
 
         for data_type in args.data_type:
             # data
             logging.getLogger().info(f"Extracting {data_type.name} data...")
             data_filepath = os.path.join(temp_dir, f"{data_type.name.lower()}.csv")
-            indexes, data_filepaths = sysstat_data.generateDataToPlot(data_type, data_filepath)
+            indexes, data_filepaths = sysstat_data.generateDataToPlot(
+                data_type, data_filepath
+            )
             if not data_filepaths:
                 data_filepaths = {"": data_filepath}
 
             # plot graph
             for graph_format in (GraphFormat.TXT, args.img_format):
-                logging.getLogger().info(f"Generating {data_type.name} {graph_format.name} report...")
+                logging.getLogger().info(
+                    f"Generating {data_type.name} {graph_format.name} report..."
+                )
                 graph_filepaths[graph_format].append(
-                    os.path.join(temp_dir, f"{data_type.name.lower()}.{graph_format.name.lower()}")
+                    os.path.join(
+                        temp_dir,
+                        f"{data_type.name.lower()}.{graph_format.name.lower()}",
+                    )
                 )
                 plotter.plot(
                     graph_format,
@@ -789,7 +897,9 @@ if __name__ == "__main__":
 
         real_mail_from = email.utils.parseaddr(args.mail_from)[1]
         real_mail_to = email.utils.parseaddr(args.mail_to)[1]
-        logging.getLogger().info(f"Sending email from {real_mail_from!r} to {real_mail_to!r}...")
+        logging.getLogger().info(
+            f"Sending email from {real_mail_from!r} to {real_mail_to!r}..."
+        )
         cmd = ("sendmail", "-f", real_mail_from, real_mail_to)
         logging.getLogger().debug(cmd_to_string(cmd))
         subprocess.run(cmd, input=email_data, universal_newlines=True, check=True)

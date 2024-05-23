@@ -530,7 +530,7 @@ class Plotter:
         elif format is GraphFormat.PNG:
             gnuplot_code_lines.extend(
                 (
-                    f"set terminal png transparent size {img_size[0]},{img_size[1]} font 'Liberation,9' noenhanced",
+                    f"set terminal png size {img_size[0]},{img_size[1]} font 'Liberation,9' noenhanced",
                     f"set output '{output_filepath}'",
                 )
             )

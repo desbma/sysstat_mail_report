@@ -13,7 +13,6 @@ import gzip
 import logging
 import lzma
 import os
-import re
 import shlex
 import shutil
 import subprocess
@@ -66,32 +65,6 @@ def get_max_network_speed() -> int:
         max_speed = max(max_speed, new_speed)
     logger.info(f"Maximum interface speed: {max_speed} Mb/s")
     return max_speed
-
-
-def get_reboot_times() -> list[datetime.datetime]:
-    """Return a list of datetime.datetime representing machine reboot times."""
-    reboot_times = []
-    date_regex = re.compile(r".*boot\s*([\w\s]+\d{2}:\d{2}:\d{2} \d{4}).*$")
-    for log_filepath in (Path("/var/log/wtmp.1"), Path("/var/log/wtmp")):
-        if not log_filepath.is_file():
-            continue
-        cmd = ("last", "-F", "-R", "reboot", "-f", str(log_filepath))
-        logger.debug(shlex.join(cmd))
-        output_lines = subprocess.run(
-            cmd,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=None,
-            text=True,
-            check=True,
-        ).stdout.splitlines()[:-2]
-        for line in output_lines:
-            date_match = date_regex.match(line)
-            assert date_match is not None
-            date_str = date_match.group(1).strip()
-            date = datetime.datetime.strptime(date_str, r"%a %b %d %H:%M:%S %Y")
-            reboot_times.append(date)
-    return reboot_times
 
 
 def minify_svg(svg_filepath: Path) -> str:
@@ -259,6 +232,32 @@ class SysstatData:
         logger.warning(f"No sysstat data file for date {date}")
         return None
 
+    @staticmethod
+    def run_sadf(sa_filepath: Path, *args: str) -> str:
+        """Return CSV data extracted from a sysstat data file."""
+        cmd = ("sadf", "-d", "-U", *args, str(sa_filepath))
+        logger.debug(shlex.join(cmd))
+        return subprocess.run(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=None,
+            text=True,
+            check=True,
+            # decimal point, whatever the locale
+            env=dict(os.environ, LC_ALL="C"),
+        ).stdout
+
+    def get_reboot_times(self) -> list[int]:
+        """Return machine reboot times, as Unix timestamps."""
+        reboot_times = []
+        for sa_filepath in self.sa_filepaths:
+            lines = self.run_sadf(sa_filepath).splitlines()
+            reboot_times.extend(
+                int(line.split(";", 3)[2]) for line in lines if ";LINUX-RESTART" in line
+            )
+        return reboot_times
+
     def generate_raw_csv(
         self, data_type: SysstatDataType, sa_filepath: Path, output_file: IO[str]
     ) -> None:
@@ -269,26 +268,9 @@ class SysstatData:
             if data_type in (SysstatDataType.SOCKET, SysstatDataType.TCP4)
             else ()
         )
-        cmd = (
-            "sadf",
-            "-d",
-            *horizontal,
-            "-U",
-            "--",
-            *self.SADF_ARGS[data_type],
-            str(sa_filepath),
-        )
-        logger.debug(shlex.join(cmd))
-        lines = subprocess.run(
-            cmd,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=None,
-            text=True,
-            check=True,
-            # decimal point, whatever the locale
-            env=dict(os.environ, LC_ALL="C"),
-        ).stdout.splitlines(keepends=True)
+        lines = self.run_sadf(
+            sa_filepath, *horizontal, "--", *self.SADF_ARGS[data_type]
+        ).splitlines(keepends=True)
         # a file holding only reboot records has no header
         header = next((line for line in lines if line.startswith("#")), None)
         if header is None:
@@ -298,12 +280,11 @@ class SysstatData:
             return
         if output_file.tell() == 0:
             output_file.write(header)
-        # skip header lines, repeated after each reboot,
-        # and LINUX-RESTART records, whose interval is -1
+        # skip header lines, repeated after each reboot, and LINUX-RESTART records
         output_file.writelines(
             line
             for line in lines
-            if not line.startswith("#") and int(line.split(";", 2)[1]) != -1
+            if not line.startswith("#") and ";LINUX-RESTART" not in line
         )
 
     def generate_data_to_plot(
@@ -421,7 +402,7 @@ def plot(
     data_filepaths: dict[str, Path],
     data_indexes: Sequence[int],
     data_type: SysstatDataType,
-    reboot_times: Sequence[datetime.datetime],
+    reboot_times: Sequence[int],
     output_filepath: Path,
 ) -> None:
     """Plot graph using Gnuplot."""
@@ -469,7 +450,7 @@ def plot(
 
     # reboot lines
     for reboot_time in reboot_times:
-        reboot_ts = int(reboot_time.timestamp()) + gmtoff
+        reboot_ts = reboot_time + gmtoff
         if ts_from <= reboot_ts <= ts_to:
             gnuplot_code_lines += [
                 f'set arrow from "{reboot_ts}",graph 0 to "{reboot_ts}",graph 1 lt 0 nohead front',
@@ -616,7 +597,7 @@ if __name__ == "__main__":
             GraphFormat.TXT: [],
             args.img_format: [],
         }
-        reboot_times = get_reboot_times()
+        reboot_times = sysstat_data.get_reboot_times()
 
         for data_type in args.data_type:
             # data

@@ -77,30 +77,30 @@ def get_max_network_speed() -> int:
     logging.getLogger().info(f"Maximum interface speed: {max_speed} Mb/s")
     return max_speed
 
-
 def get_reboot_times() -> List[datetime.datetime]:
-    """Return a list of datetime.datetime representing machine reboot times."""
+    """Return machine boot times from the systemd journal."""
+    result = subprocess.run(
+        ("journalctl", "--list-boots", "--no-pager"),
+        stdout=subprocess.PIPE,
+        universal_newlines=True,
+        check=True,
+    )
+
     reboot_times = []
-    date_regex = re.compile(r".*boot\s*([\w\s]+\d{2}:\d{2}:\d{2} \d{4}).*$")
-    for i in range(1, -1, -1):
-        log_filepath = "/var/log/wtmp%s" % (".%u" % (i) if i != 0 else "")
-        if os.path.isfile(log_filepath):
-            cmd = ("last", "-F", "-R", "reboot", "-f", log_filepath)
-            logging.getLogger().debug(cmd_to_string(cmd))
-            output_str = subprocess.run(
-                cmd,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                universal_newlines=True,
-                check=True,
-            ).stdout
-            output_lines = output_str.splitlines()[0:-2]
-            for line in output_lines:
-                date_match = date_regex.match(line)
-                assert date_match is not None
-                date_str = date_match.group(1).strip()
-                date = datetime.datetime.strptime(date_str, r"%a %b %d %H:%M:%S %Y")
-                reboot_times.append(date)
+
+    for line in result.stdout.splitlines():
+        match = re.match(
+            r"\s*-?\d+\s+[0-9a-f]{32}\s+\w{3}\s+"
+            r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})",
+            line,
+        )
+        if match:
+            reboot_times.append(
+                datetime.datetime.strptime(
+                    match.group(1), "%Y-%m-%d %H:%M:%S"
+                )
+            )
+
     return reboot_times
 
 

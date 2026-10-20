@@ -25,7 +25,7 @@ This tool attempts to be simple and efficient and allow generating periodic repo
 - Construct email with both PNG and alternate ASCII graphs to be compatible with text only mail clients, or low bandwidth mail viewing
 - Automatically crunch images to save a few KB per email without any loss of quality
 - Optionally support SVG images for crisp looking graphs <sup>1</sup>
-- Few dependencies: sysstat, gnuplot, sendmail and Python 3.6 (no Python package dependencies): installing is as simple as copying a file on most servers. No server or daemon is required or installed.
+- Few dependencies: sysstat, gnuplot, sendmail and Python (no Python package dependencies): installing is as simple as copying a file on most servers. No server or daemon is required or installed.
 - Execution is usually very fast, even with large data files, because all the data processing is done by Gnuplot
 
 <sup>1. SVG rendering is currently not supported [by many mail clients](https://www.caniemail.com/features/html-svg/). In case of doubt, use the default PNG + text fallback mode.</sup>
@@ -51,7 +51,7 @@ Weekly network graph:
 
 ## Dependencies
 
-- [Python >= 3.6](https://www.python.org/downloads/)
+- [Python >= 3.11](https://www.python.org/downloads/)
 - [Gnuplot >= 4.6](http://www.gnuplot.info/)
 - sendmail (configured and ready to send emails)
 - [oxipng](https://github.com/shssoichiro/oxipng) or [optipng](http://optipng.sourceforge.net/) (optional)

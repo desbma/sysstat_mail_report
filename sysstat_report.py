@@ -178,10 +178,10 @@ class SysstatData:
         ),
         SysstatDataType.MEM: (
             "timestamp",
-            "kbmemused",
+            "kbavail",
             "kbbuffers",
-            "kbcached",
             "kbdirty",
+            "kbmemfree",
         ),
         SysstatDataType.SWAP: ("timestamp", r"%swpused"),
         SysstatDataType.NET: ("timestamp", "rxkB/s", "txkB/s"),
@@ -369,7 +369,7 @@ PLOT_CONFIGS = {
     ),
     SysstatDataType.MEM: PlotConfig(
         "Memory",
-        ("used", "buffers", "cached", "dirty"),
+        ("used", "buffers", "dirty", "cached"),
         "Memory used (MiB)",
         (0, get_total_memory_mib()),
     ),
@@ -459,7 +459,7 @@ def plot(
 
     # plot
     plot_cmds = []
-    stacked = data_type is SysstatDataType.CPU
+    stacked = data_type in (SysstatDataType.CPU, SysstatDataType.MEM)
     plot_type = "filledcurve x1" if stacked else "line"
     smooth = report_type is not ReportType.DAILY
     unit_suffix = {
@@ -467,20 +467,28 @@ def plot(
         SysstatDataType.NET: "*8192/1000000",  # KiB/s to Mb/s
         SysstatDataType.IO: "*512/1000000",  # block/s to MB/s
     }.get(data_type, "")
+    column_ydatas = [f"(${data_index}{unit_suffix})" for data_index in data_indexes[1:]]
+    if data_type is SysstatDataType.MEM:
+        # split non free memory into unavailable memory and disjoint reclaimable parts
+        avail, buffers, dirty, free = column_ydatas
+        column_ydatas = [
+            f"({yrange[1]}-{avail})",
+            buffers,
+            dirty,
+            f"({avail}-{free}-{buffers}-{dirty})",
+        ]
+    if stacked:
+        # values are cumulative
+        for i in range(1, len(column_ydatas)):
+            column_ydatas[i] = f"({column_ydatas[i]}+{column_ydatas[i - 1]})"
     for data_file_nickname, data_filepath in data_filepaths.items():
-        prev_ydata = None
-        for data_index, data_title in zip(data_indexes[1:], data_titles, strict=True):
-            ydata = f"(${data_index}{unit_suffix})"
+        for ydata, data_title in zip(column_ydatas, data_titles, strict=True):
             data_title = "_".join(filter(None, (data_file_nickname, data_title)))
             data_title = data_title.replace("'", "''")
-            if stacked and prev_ydata is not None:
-                # values are cumulative
-                ydata = f"({ydata}+{prev_ydata})"
             plot_cmds.append(
                 f"'{data_filepath}' using (${data_indexes[0]}+{gmtoff}):{ydata}"
                 f" {'smooth bezier ' if smooth else ''}with {plot_type} title '{data_title}'"
             )
-            prev_ydata = ydata
     if stacked:
         plot_cmds.reverse()
     gnuplot_code_lines.append(f"plot {', '.join(plot_cmds)}")

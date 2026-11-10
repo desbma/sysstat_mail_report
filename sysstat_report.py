@@ -357,7 +357,13 @@ class PlotConfig(NamedTuple):
     yrange: tuple[int, int | str | None]
 
 
-PLOT_CONFIGS = {
+def _build_plot_configs() -> dict[SysstatDataType, PlotConfig]:
+    """Build the plot configuration, probing total memory and network speed.
+
+    Built on demand (rather than at import time) so that importing this
+    module does not require /proc or /sys to be available.
+    """
+    return {
     SysstatDataType.LOAD: PlotConfig(
         "Load", ("ldavg-5",), "5min load average", (0, f"{os.cpu_count()}<*")
     ),
@@ -392,7 +398,19 @@ PLOT_CONFIGS = {
     SysstatDataType.FS_USAGE: PlotConfig(
         "Filesystem usage", ("",), "Usage (%)", (0, 100)
     ),
-}
+    }
+
+
+def __getattr__(name: str) -> dict[SysstatDataType, PlotConfig]:
+    """Provide the PLOT_CONFIGS module attribute lazily (PEP 562).
+
+    The memory and network y-axis ranges require reading /proc and /sys,
+    which may not exist on the importing machine, so the configuration is
+    built on first use instead of at import time.
+    """
+    if name == "PLOT_CONFIGS":
+        return _build_plot_configs()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def plot(
@@ -406,7 +424,7 @@ def plot(
     output_filepath: Path,
 ) -> None:
     """Plot graph using Gnuplot."""
-    title, data_titles, ylabel, yrange = PLOT_CONFIGS[data_type]
+    title, data_titles, ylabel, yrange = _build_plot_configs()[data_type]
 
     # output setup
     if graph_format is GraphFormat.TXT:

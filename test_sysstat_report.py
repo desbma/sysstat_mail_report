@@ -5,12 +5,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-# fake network interfaces, probed at import
-with (
-    mock.patch.object(Path, "iterdir", return_value=(Path("lo"), Path("eth0"))),
-    mock.patch.object(Path, "read_text", return_value="1000"),
-):
-    import sysstat_report
+# The module must import without probing the system (no /proc or /sys
+# access at import time), so no mocking is needed here.
+import sysstat_report
 
 
 class TestPlot(unittest.TestCase):
@@ -75,6 +72,36 @@ class TestPlot(unittest.TestCase):
                 ("used", total - avail),
             ],
         )
+
+
+class TestLazyPlotConfigs(unittest.TestCase):
+    """The plot configuration must be built on demand, not at import."""
+
+    def test_cpu_plot_without_system_files(self) -> None:
+        """Plot a data type with a static y-range without /proc or /sys."""
+        with (
+            mock.patch.object(
+                sysstat_report, "get_total_memory_mib", return_value=8192
+            ),
+            mock.patch.object(
+                sysstat_report, "get_max_network_speed", return_value=1000
+            ),
+            mock.patch.object(sysstat_report.subprocess, "run") as run_mock,
+        ):
+            sysstat_report.plot(
+                sysstat_report.ReportType.DAILY,
+                sysstat_report.GraphFormat.SVG,
+                (800, 400),
+                {"": Path("cpu.csv")},
+                (1, 2, 3, 4, 5, 6),
+                sysstat_report.SysstatDataType.CPU,
+                (),
+                Path("cpu.svg"),
+            )
+        gnuplot_code = run_mock.call_args.kwargs["input"]
+        self.assertIn("set title 'CPU'", gnuplot_code)
+        self.assertIn("'cpu.csv' using ($1+", gnuplot_code)
+        self.assertIn("title 'user'", gnuplot_code)
 
 
 if __name__ == "__main__":
